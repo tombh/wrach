@@ -1,0 +1,11 @@
+[package]
+name = "shaders"
+version = "0.0.0"
+authors = []
+edition = "2018"
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "04146858", features = [ "glam" ] }
