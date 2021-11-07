@@ -3,6 +3,7 @@ name = "wrach"
 version = "0.0.0"
 authors = []
 edition = "2018"
+resolver = "2"
 
 [features]
 default = ["use-compiled-tools"]
@@ -12,9 +13,10 @@ use-compiled-tools = ["spirv-builder/use-compiled-tools"]
 [dependencies]
 shaders = { path = "shaders" }
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
-wgpu = "0.6.0"
-winit = { version = "0.23", features = ["web-sys"] }
-wgpu-subscriber = "0.1.0"
+wgpu = { version = "0.11.0", features = ["spirv"] }
+wgpu-hal = "=0.11.2"
+winit = { version = "0.25", features = ["web-sys"] }
+bytemuck = { version = "1.6.3", features = ["derive"] }
 
 [build-dependencies]
 spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "04146858", features = [ "glam" ] }
@@ -38,5 +40,5 @@ opt-level = 3
 
 # HACK(eddyb) don't optimize the shader crate, to avoid `spirv-opt` taking
 # a long time (10 minutes if itself was optimized, over an hour otherwise).
-[profile.release.package."ray-tracing-shaders"]
+[profile.release.package."shaders"]
 opt-level = 0
