@@ -12,64 +12,142 @@
 #[cfg(not(target_arch = "spirv"))]
 use spirv_std::macros::spirv;
 
-use bytemuck::{Pod, Zeroable};
-use glam::{vec2, UVec3, Vec2, Vec4};
+// Note: This cfg is incorrect on its surface, it really should be "are we compiling with std", but
+// we tie #[no_std] above to the same condition, so it's fine.
+#[cfg(target_arch = "spirv")]
+use spirv_std::num_traits::Float;
+
+use glam::{vec2, vec4, UVec3, Vec2, Vec4};
 pub use spirv_std::glam;
-use vertex::fs;
 
 mod compute;
 mod vertex;
 
-#[derive(Copy, Clone, Pod, Zeroable)]
-#[repr(C)]
-pub struct ShaderConstants {
-    pub width: u32,
-    pub height: u32,
-    pub time: f32,
-    pub cursor_x: f32,
-    pub cursor_y: f32,
-    pub drag_start_x: f32,
-    pub drag_start_y: f32,
-    pub drag_end_x: f32,
-    pub drag_end_y: f32,
-
-    /// Bit mask of the pressed buttons (0 = Left, 1 = Middle, 2 = Right).
-    pub mouse_button_pressed: u32,
-
-    /// The last time each mouse button (Left, Middle or Right) was pressed,
-    /// or `f32::NEG_INFINITY` for buttons which haven't been pressed yet.
-    ///
-    /// If this is the first frame after the press of some button, that button's
-    /// entry in `mouse_button_press_time` will exactly equal `time`.
-    pub mouse_button_press_time: [f32; 3],
+struct Particle {
+    pos: Vec2,
+    vel: Vec2,
 }
 
+pub struct SimParams {
+    delta_t: f32,
+    rule1_distance: f32,
+    rule2_distance: f32,
+    rule3_distance: f32,
+    rule1_scale: f32,
+    rule2_scale: f32,
+    rule3_scale: f32,
+}
+
+// [[stride(16)]]
+pub struct Particles {
+    particles: [Particle; 1500],
+}
+
+// https://github.com/austinEng/Project6-Vulkan-Flocking/blob/master/data/shaders/computeparticles/particle.comp
 // LocalSize/numthreads of (x = 64, y = 1, z = 1)
 #[spirv(compute(threads(64)))]
 pub fn main_cs(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] prime_indices: &mut [u32],
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] params: &SimParams,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut Particles,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut Particles,
 ) {
+    let total = particles_src.particles.len();
     let index = id.x as usize;
-    prime_indices[index] = compute::unwrap_or_max(compute::collatz(prime_indices[index]));
-}
+    if index >= total {
+        return;
+    }
 
-#[spirv(fragment)]
-pub fn main_fs(
-    #[spirv(frag_coord)] in_frag_coord: Vec4,
-    #[spirv(push_constant)] constants: &ShaderConstants,
-    output: &mut Vec4,
-) {
-    let frag_coord = vec2(in_frag_coord.x, in_frag_coord.y);
-    *output = fs(constants, frag_coord);
+    let mut v_pos = particles_src.particles[index].pos;
+    let mut v_vel = particles_src.particles[index].vel;
+
+    let mut c_mass = vec2(0.0, 0.0);
+    let mut c_vel = vec2(0.0, 0.0);
+    let mut col_vel = vec2(0.0, 0.0);
+    let mut c_mass_count: i32 = 0;
+    let mut c_vel_count: i32 = 0;
+
+    let mut i: usize = 0;
+    loop {
+        if i >= total {
+            break;
+        }
+        if i == index {
+            i = i + 1;
+            continue;
+        }
+
+        let pos = particles_src.particles[i].pos;
+        let vel = particles_src.particles[i].vel;
+
+        if pos.distance(v_pos) < params.rule1_distance {
+            c_mass = c_mass + pos;
+            c_mass_count = c_mass_count + 1;
+        }
+        if pos.distance(v_pos) < params.rule2_distance {
+            col_vel = col_vel - (pos - v_pos);
+        }
+        if pos.distance(v_pos) < params.rule3_distance {
+            c_vel = c_vel + vel;
+            c_vel_count = c_vel_count + 1;
+        }
+
+        i = i + 1;
+    }
+    if c_mass_count > 0 {
+        c_mass = c_mass * (1.0 / c_mass_count as f32) - v_pos;
+    }
+    if c_vel_count > 0 {
+        c_vel = c_vel * (1.0 / c_vel_count as f32);
+    }
+
+    v_vel = v_vel
+        + (c_mass * params.rule1_scale)
+        + (col_vel * params.rule2_scale)
+        + (c_vel * params.rule3_scale);
+
+    // clamp velocity for a more pleasing simulation
+    v_vel = v_vel.normalize() * v_vel.clamp_length(0.0, 0.1);
+
+    // kinematic update
+    v_pos = v_pos + (v_vel * params.delta_t);
+
+    // Wrap around boundary
+    if v_pos.x < -1.0 {
+        v_pos.x = 1.0;
+    }
+    if v_pos.x > 1.0 {
+        v_pos.x = -1.0;
+    }
+    if v_pos.y < -1.0 {
+        v_pos.y = 1.0;
+    }
+    if v_pos.y > 1.0 {
+        v_pos.y = -1.0;
+    }
+
+    // Write back
+    *particles_dst.particles[index].pos = *v_pos;
+    *particles_dst.particles[index].vel = *v_vel;
 }
 
 #[spirv(vertex)]
-pub fn main_vs(#[spirv(vertex_index)] vert_idx: i32, #[spirv(position)] builtin_pos: &mut Vec4) {
-    // Create a "full screen triangle" by mapping the vertex index.
-    // ported from https://www.saschawillems.de/blog/2016/08/13/vulkan-tutorial-on-rendering-a-fullscreen-quad-without-buffers/
-    let uv = vec2(((vert_idx << 1) & 2) as f32, (vert_idx & 2) as f32);
-    let pos = 2.0 * uv - Vec2::ONE;
+pub fn main_vs(
+    #[spirv(vertex_index)] _vert_id: i32,
+    particle_pos: Vec2,
+    particle_vel: Vec2,
+    position: Vec2,
+    #[spirv(position)] builtin_pos: &mut Vec4,
+) {
+    let angle = -particle_vel.x.atan2(particle_vel.y);
+    let pos = vec2(
+        position.x * angle.cos() - position.y * angle.sin(),
+        position.x * angle.sin() + position.y * angle.cos(),
+    );
+    *builtin_pos = vec4(pos.x + particle_pos.x, pos.y + particle_pos.y, 0.0, 1.0);
+}
 
-    *builtin_pos = pos.extend(0.0).extend(1.0);
+#[spirv(fragment)]
+pub fn main_fs(output: &mut Vec4) {
+    *output = vec4(1.0, 0.0, 0.0, 1.0);
 }
