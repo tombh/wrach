@@ -9,6 +9,9 @@ use wgpu::util::DeviceExt;
 
 mod framework;
 
+use shaders::glam::vec2;
+use shaders::Particle;
+
 // number of boid particles to simulate
 
 const NUM_PARTICLES: u32 = 1500;
@@ -177,18 +180,16 @@ impl framework::Example for Example {
 
         // buffer for all particles data of type [(posx,posy,velx,vely),...]
 
-        let mut initial_particle_data = vec![0.0f32; (4 * NUM_PARTICLES) as usize];
+        let mut initial_particle_data: Vec<Particle> = Vec::new();
         let mut rng = rand::rngs::StdRng::seed_from_u64(42);
         let unif = Uniform::new_inclusive(-1.0, 1.0);
-        for particle_instance_chunk in initial_particle_data.chunks_mut(4) {
-            particle_instance_chunk[0] = unif.sample(&mut rng); // posx
-            particle_instance_chunk[1] = unif.sample(&mut rng); // posy
-            particle_instance_chunk[2] = unif.sample(&mut rng) * 0.1; // velx
-            particle_instance_chunk[3] = unif.sample(&mut rng) * 0.1; // vely
+        for _ in 0..NUM_PARTICLES {
+            let particle = Particle {
+                pos: vec2(unif.sample(&mut rng), unif.sample(&mut rng)),
+                vel: vec2(unif.sample(&mut rng), unif.sample(&mut rng)),
+            };
+            initial_particle_data.push(particle)
         }
-
-        // creates two buffers of particle data each of size NUM_PARTICLES
-        // the two buffers alternate as dst and src for each frame
 
         let mut particle_buffers = Vec::<wgpu::Buffer>::new();
         let mut particle_bind_groups = Vec::<wgpu::BindGroup>::new();

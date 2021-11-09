@@ -1,5 +1,3 @@
-//! Ported to Rust from <https://github.com/Tw1ddle/Sky-Shader/blob/master/src/shaders/glsl/sky.fragment>
-
 #![cfg_attr(
     target_arch = "spirv",
     feature(register_attr),
@@ -17,15 +15,25 @@ use spirv_std::macros::spirv;
 #[cfg(target_arch = "spirv")]
 use spirv_std::num_traits::Float;
 
-use glam::{vec2, vec4, UVec3, Vec2, Vec4};
+#[cfg(not(target_arch = "spirv"))]
+pub use glam;
+
+#[cfg(target_arch = "spirv")]
 pub use spirv_std::glam;
+
+use glam::{vec2, vec4, UVec3, Vec2, Vec4};
 
 mod compute;
 mod vertex;
 
-struct Particle {
-    pos: Vec2,
-    vel: Vec2,
+#[cfg(not(target_arch = "spirv"))]
+use bytemuck::{Pod, Zeroable};
+
+#[cfg_attr(not(target_arch = "spirv"), derive(Copy, Clone, Pod, Zeroable))]
+#[repr(C)]
+pub struct Particle {
+    pub pos: Vec2,
+    pub vel: Vec2,
 }
 
 pub struct SimParams {
@@ -38,13 +46,10 @@ pub struct SimParams {
     rule3_scale: f32,
 }
 
-// [[stride(16)]]
 pub struct Particles {
     particles: [Particle; 1500],
 }
 
-// https://github.com/austinEng/Project6-Vulkan-Flocking/blob/master/data/shaders/computeparticles/particle.comp
-// LocalSize/numthreads of (x = 64, y = 1, z = 1)
 #[spirv(compute(threads(64)))]
 pub fn main_cs(
     #[spirv(global_invocation_id)] id: UVec3,

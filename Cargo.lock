@@ -728,6 +728,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2c626156a479bfb5a4362c43f5abadd700af33ebc8db068089d9cb92493d6ab"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "glow"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1612,6 +1621,7 @@ name = "shaders"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
+ "glam 0.20.0",
  "spirv-std",
 ]
 
@@ -1683,7 +1693,7 @@ version = "0.4.0-alpha.12"
 source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=04146858#04146858ce1fc631717db21071b99b8101e12cda"
 dependencies = [
  "bitflags",
- "glam",
+ "glam 0.19.0",
  "num-traits",
  "spirv-std-macros",
  "spirv-types",

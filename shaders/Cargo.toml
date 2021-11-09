@@ -9,4 +9,8 @@ crate-type = ["dylib"]
 
 [dependencies]
 spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "04146858", features = [ "glam" ] }
+
+[target.'cfg(not(target_arch = "spirv"))'.dependencies]
 bytemuck = { version = "1.6.3", features = ["derive"] }
+# We need the native version of glam for bytemuck support
+glam = { version = "0.20.0", features = ["bytemuck"] }
