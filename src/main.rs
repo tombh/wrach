@@ -13,11 +13,9 @@ use shaders::glam::vec2;
 use shaders::Particle;
 
 // number of boid particles to simulate
-
 const NUM_PARTICLES: u32 = 1500;
 
 // number of single-particle calculations (invocations) in each gpu work group
-
 const PARTICLES_PER_GROUP: u32 = 64;
 
 /// Example struct holds references to wgpu resources and frame persistent data
@@ -72,7 +70,6 @@ impl framework::Example for Example {
         });
 
         // create compute bind layout group and compute pipeline layout
-
         let compute_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -123,7 +120,6 @@ impl framework::Example for Example {
             });
 
         // create render pipeline with empty bind group layout
-
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render"),
@@ -160,8 +156,7 @@ impl framework::Example for Example {
             multisample: wgpu::MultisampleState::default(),
         });
 
-        // create compute pipeline
-
+        // Create compute pipeline
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Compute pipeline"),
             layout: Some(&compute_pipeline_layout),
@@ -169,17 +164,20 @@ impl framework::Example for Example {
             entry_point: "main_cs",
         });
 
-        // buffer for the three 2d triangle vertices of each instance
-
-        let vertex_buffer_data = [-0.01f32, -0.02, 0.01, -0.02, 0.00, 0.02];
+        // A square made of 2 triangles
+        let vertex_buffer_data = [
+            // First triangle ----------------------
+            -0.01f32, -0.01, -0.01, 0.01, 0.01, 0.01,
+            // Second triangle ----------------------
+            -0.01, -0.01, 0.01, 0.01, 0.01, -0.01,
+        ];
         let vertices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::bytes_of(&vertex_buffer_data),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        // buffer for all particles data of type [(posx,posy,velx,vely),...]
-
+        // Buffer for all particles data of type [(posx,posy,velx,vely),...]
         let mut initial_particle_data: Vec<Particle> = Vec::new();
         let mut rng = rand::rngs::StdRng::seed_from_u64(42);
         let unif = Uniform::new_inclusive(-1.0, 1.0);
@@ -207,7 +205,6 @@ impl framework::Example for Example {
 
         // create two bind groups, one for each buffer as the src
         // where the alternate buffer is used as the dst
-
         for i in 0..2 {
             particle_bind_groups.push(device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &compute_bind_group_layout,
@@ -234,7 +231,6 @@ impl framework::Example for Example {
             ((NUM_PARTICLES as f32) / (PARTICLES_PER_GROUP as f32)).ceil() as u32;
 
         // returns Example struct and No encoder commands
-
         Example {
             particle_bind_groups,
             particle_buffers,
@@ -309,7 +305,7 @@ impl framework::Example for Example {
             rpass.set_vertex_buffer(0, self.particle_buffers[(self.frame_num + 1) % 2].slice(..));
             // the three instance-local vertices
             rpass.set_vertex_buffer(1, self.vertices_buffer.slice(..));
-            rpass.draw(0..3, 0..NUM_PARTICLES);
+            rpass.draw(0..6, 0..NUM_PARTICLES);
         }
         command_encoder.pop_debug_group();
 

@@ -12,8 +12,9 @@ use spirv_std::macros::spirv;
 
 // Note: This cfg is incorrect on its surface, it really should be "are we compiling with std", but
 // we tie #[no_std] above to the same condition, so it's fine.
-#[cfg(target_arch = "spirv")]
-use spirv_std::num_traits::Float;
+// #[cfg(target_arch = "spirv")]
+// For all the glam maths like trigonometry
+// use spirv_std::num_traits::Float;
 
 #[cfg(not(target_arch = "spirv"))]
 pub use glam;
@@ -136,22 +137,26 @@ pub fn main_cs(
     *particles_dst.particles[index].vel = *v_vel;
 }
 
+// Called for every index of a vertex, there are 6 in a square, because a square
+// is made up from 2 triangles
 #[spirv(vertex)]
 pub fn main_vs(
     #[spirv(vertex_index)] _vert_id: i32,
-    particle_pos: Vec2,
-    particle_vel: Vec2,
-    position: Vec2,
-    #[spirv(position)] builtin_pos: &mut Vec4,
+    particle_position: Vec2,
+    // interesting to consider how other properties could "shape" pixels
+    _particle_velocity: Vec2,
+    vertex: Vec2,
+    #[spirv(position)] screen_position: &mut Vec4,
 ) {
-    let angle = -particle_vel.x.atan2(particle_vel.y);
-    let pos = vec2(
-        position.x * angle.cos() - position.y * angle.sin(),
-        position.x * angle.sin() + position.y * angle.cos(),
+    *screen_position = vec4(
+        particle_position.x + vertex.x,
+        particle_position.y + vertex.y,
+        0.0,
+        1.0,
     );
-    *builtin_pos = vec4(pos.x + particle_pos.x, pos.y + particle_pos.y, 0.0, 1.0);
 }
 
+// Basically just the colour
 #[spirv(fragment)]
 pub fn main_fs(output: &mut Vec4) {
     *output = vec4(1.0, 0.0, 0.0, 1.0);
