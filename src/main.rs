@@ -9,11 +9,11 @@ use wgpu::util::DeviceExt;
 
 mod framework;
 
-use shaders::glam::vec2;
+use shaders::wrach_glam::glam::vec2;
 use shaders::Particle;
 
-// number of boid particles to simulate
-const NUM_PARTICLES: u32 = 1500;
+const NUM_PARTICLES: u32 = shaders::NUM_PARTICLES as u32;
+const STARTING_VELOCITY: f32 = 0.00001;
 
 // number of single-particle calculations (invocations) in each gpu work group
 const PARTICLES_PER_GROUP: u32 = 64;
@@ -165,26 +165,33 @@ impl framework::Example for Example {
         });
 
         // A square made of 2 triangles
-        let vertex_buffer_data = [
+        let vertex_buffer_data: Vec<f32> = [
             // First triangle ----------------------
-            -0.01f32, -0.01, -0.01, 0.01, 0.01, 0.01,
+            -0.01, -0.01, -0.01, 0.01, 0.01, 0.01,
             // Second triangle ----------------------
             -0.01, -0.01, 0.01, 0.01, 0.01, -0.01,
-        ];
+        ]
+        .iter()
+        .map(|x| 0.3 * x)
+        .collect();
+        let mut square = [0.0; 12];
+        for i in 0..12 {
+            square[i] = vertex_buffer_data[i];
+        }
         let vertices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::bytes_of(&vertex_buffer_data),
+            contents: bytemuck::bytes_of(&square),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         // Buffer for all particles data of type [(posx,posy,velx,vely),...]
         let mut initial_particle_data: Vec<Particle> = Vec::new();
-        let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+        let mut rng = rand::rngs::StdRng::from_entropy();
         let unif = Uniform::new_inclusive(-1.0, 1.0);
         for _ in 0..NUM_PARTICLES {
             let particle = Particle {
-                pos: vec2(unif.sample(&mut rng), unif.sample(&mut rng)),
-                vel: vec2(unif.sample(&mut rng), unif.sample(&mut rng)),
+                position: vec2(unif.sample(&mut rng), unif.sample(&mut rng)),
+                velocity: vec2(unif.sample(&mut rng), unif.sample(&mut rng)) * STARTING_VELOCITY,
             };
             initial_particle_data.push(particle)
         }
