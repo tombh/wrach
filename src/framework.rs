@@ -87,13 +87,19 @@ async fn setup<E: Example>(title: &str) -> Setup {
 
     let event_loop = EventLoop::new();
     let mut builder = winit::window::WindowBuilder::new();
-    builder = builder.with_title(title);
+    builder = builder
+        .with_title(title)
+        .with_inner_size(winit::dpi::PhysicalSize::new(
+            shaders::MAP_WIDTH,
+            shaders::MAP_HEIGHT,
+        ));
     #[cfg(windows_OFF)] // TODO
     {
         use winit::platform::windows::WindowBuilderExtWindows;
         builder = builder.with_no_redirection_bitmap(true);
     }
     let window = builder.build(&event_loop).unwrap();
+    // window.set_inner_size
 
     #[cfg(target_arch = "wasm32")]
     {

@@ -1,5 +1,3 @@
-// Note: This cfg is incorrect on its surface, it really should be "are we compiling with std", but
-// we tie #[no_std] above to the same condition, so it's fine.
 #[cfg(target_arch = "spirv")]
 // For all the glam maths like trigonometry
 use spirv_std::num_traits::Float;
@@ -19,7 +17,7 @@ pub struct Particle {
 
 impl Particle {
     const SIZE: f32 = 0.1;
-    const E: f32 = 0.00000000001;
+    const E: f32 = 0.00001;
 
     pub fn force(&self, other: Particle) -> Vec2 {
         let distance = self.distance(other);

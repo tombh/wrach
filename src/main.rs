@@ -23,6 +23,7 @@ struct Example {
     particle_bind_groups: Vec<wgpu::BindGroup>,
     particle_buffers: Vec<wgpu::Buffer>,
     vertices_buffer: wgpu::Buffer,
+    pre_compute_pipeline: wgpu::ComputePipeline,
     compute_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
     work_group_count: u32,
@@ -109,6 +110,19 @@ impl framework::Example for Example {
                         },
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<
+                                shaders::PixelMap,
+                            >()
+                                as u64),
+                        },
+                        count: None,
+                    },
                 ],
                 label: None,
             });
@@ -155,6 +169,15 @@ impl framework::Example for Example {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
         });
+
+        // Create pre-compute pipeline
+        let pre_compute_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Pre-compute pipeline"),
+                layout: Some(&compute_pipeline_layout),
+                module: &shader_module,
+                entry_point: "pre_main_cs",
+            });
 
         // Create compute pipeline
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
@@ -210,6 +233,13 @@ impl framework::Example for Example {
             );
         }
 
+        let pixel_map: shaders::PixelMap = [0; shaders::MAP_SIZE];
+        let pixel_map_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&format!("Pixel Map")),
+            contents: bytemuck::cast_slice(&pixel_map),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        });
+
         // create two bind groups, one for each buffer as the src
         // where the alternate buffer is used as the dst
         for i in 0..2 {
@@ -228,6 +258,10 @@ impl framework::Example for Example {
                         binding: 2,
                         resource: particle_buffers[(i + 1) % 2].as_entire_binding(), // bind to opposite buffer
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: pixel_map_buffer.as_entire_binding(),
+                    },
                 ],
                 label: None,
             }));
@@ -242,6 +276,7 @@ impl framework::Example for Example {
             particle_bind_groups,
             particle_buffers,
             vertices_buffer,
+            pre_compute_pipeline,
             compute_pipeline,
             render_pipeline,
             work_group_count,
@@ -292,18 +327,22 @@ impl framework::Example for Example {
         let mut command_encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        command_encoder.push_debug_group("compute boid movement");
+        command_encoder.push_debug_group("main compute");
         {
             // compute pass
             let mut cpass =
                 command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
+            cpass.set_pipeline(&self.pre_compute_pipeline);
+            cpass.set_bind_group(0, &self.particle_bind_groups[self.frame_num % 2], &[]);
+            cpass.dispatch(self.work_group_count, 1, 1);
+
             cpass.set_pipeline(&self.compute_pipeline);
             cpass.set_bind_group(0, &self.particle_bind_groups[self.frame_num % 2], &[]);
             cpass.dispatch(self.work_group_count, 1, 1);
         }
         command_encoder.pop_debug_group();
 
-        command_encoder.push_debug_group("render boids");
+        command_encoder.push_debug_group("render pixels");
         {
             // render pass
             let mut rpass = command_encoder.begin_render_pass(&render_pass_descriptor);
