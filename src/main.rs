@@ -1,6 +1,3 @@
-// Flocking boids example with gpu compute update pass
-// adapted from https://github.com/austinEng/webgpu-samples/blob/master/src/examples/computeBoids.ts
-
 use rand::{
     distributions::{Distribution, Uniform},
     SeedableRng,
@@ -9,10 +6,10 @@ use wgpu::util::DeviceExt;
 
 mod framework;
 
+use shaders::compute::Particle;
 use shaders::wrach_glam::glam::vec2;
-use shaders::Particle;
 
-const NUM_PARTICLES: u32 = shaders::NUM_PARTICLES as u32;
+const NUM_PARTICLES: u32 = shaders::compute::NUM_PARTICLES as u32;
 const STARTING_VELOCITY: f32 = 0.00001;
 
 // number of single-particle calculations (invocations) in each gpu work group
@@ -117,7 +114,7 @@ impl framework::Example for Example {
                             ty: wgpu::BufferBindingType::Storage { read_only: false },
                             has_dynamic_offset: false,
                             min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<
-                                shaders::PixelMap,
+                                shaders::compute::PixelMap,
                             >()
                                 as u64),
                         },
@@ -233,7 +230,7 @@ impl framework::Example for Example {
             );
         }
 
-        let pixel_map: shaders::PixelMap = [0; shaders::MAP_SIZE];
+        let pixel_map: shaders::compute::PixelMap = [0; shaders::compute::MAP_SIZE];
         let pixel_map_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Pixel Map")),
             contents: bytemuck::cast_slice(&pixel_map),

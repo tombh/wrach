@@ -128,7 +128,7 @@ mod tests {
         }
     }
 
-    fn centre() -> Particle {
+    fn _centre() -> Particle {
         Particle {
             position: vec2(0.5, 0.5),
             velocity: vec2(0.0, 0.0),
@@ -141,28 +141,11 @@ mod tests {
             velocity: vec2(0.0, 0.0),
         }
     }
-    fn bottom_right() -> Particle {
+    fn _bottom_right() -> Particle {
         Particle {
             position: vec2(1.0, 0.0),
             velocity: vec2(0.0, 0.0),
         }
-    }
-
-    #[test]
-    fn it_calculates_the_distance_between_particles() {
-        assert_eq!(centre().distance(top_right()), 0.70710677);
-        assert_eq!(centre().distance(bottom_left()), 0.70710677);
-    }
-
-    #[test]
-    fn it_calculates_the_angle_between_particles() {
-        assert_eq!(top_left().angle(top_right()), -0.0);
-        assert_eq!(top_right().angle(top_left()), 0.0);
-        assert_eq!(bottom_left().angle(top_right()), -0.7853982);
-        assert_eq!(centre().angle(top_right()), -0.7853982);
-        assert_eq!(top_right().angle(bottom_left()), 0.7853982);
-        assert_eq!(centre().angle(bottom_left()), 0.7853982);
-        assert_eq!(bottom_right().angle(bottom_left()), 0.0);
     }
 
     #[test]

@@ -44,7 +44,8 @@ pub trait Example: 'static + Sized {
         }
     }
     fn required_limits() -> wgpu::Limits {
-        wgpu::Limits::downlevel_webgl2_defaults() // These downlevel limits will allow the code to run on all possible hardware
+        // These downlevel limits will allow the code to run on all possible hardware
+        wgpu::Limits::downlevel_webgl2_defaults()
     }
     fn init(
         config: &wgpu::SurfaceConfiguration,
@@ -90,8 +91,8 @@ async fn setup<E: Example>(title: &str) -> Setup {
     builder = builder
         .with_title(title)
         .with_inner_size(winit::dpi::PhysicalSize::new(
-            shaders::MAP_WIDTH,
-            shaders::MAP_HEIGHT,
+            shaders::compute::MAP_WIDTH,
+            shaders::compute::MAP_HEIGHT,
         ));
     #[cfg(windows_OFF)] // TODO
     {
