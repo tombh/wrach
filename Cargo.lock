@@ -158,20 +158,6 @@ name = "bytemuck"
 version = "1.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72957246c41db82b8ef88a5486143830adeb8227ef9837740bdec67724cf2c5b"
-dependencies = [
- "bytemuck_derive",
-]
-
-[[package]]
-name = "bytemuck_derive"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e215f8c2f9f79cb53c8335e687ffd07d5bfcb6fe5fc80723762d0be46e7cc54"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "byteorder"
@@ -368,6 +354,29 @@ dependencies = [
  "core-graphics 0.19.2",
  "libc",
  "objc",
+]
+
+[[package]]
+name = "crevice"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d4f6c6d647171f93b5f65f1250ea929c7189b4330e9364be147d4571ae01f8f"
+dependencies = [
+ "bytemuck",
+ "crevice-derive",
+ "glam",
+ "mint",
+]
+
+[[package]]
+name = "crevice-derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d88c3459fdadc1206f8ea5c4746547c92cbbf8ec9e6d91b2242847d5e00fde4"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -724,16 +733,9 @@ version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b8509e6791516e81c1a630d0bd7fbac36d2fa8712a9da8662e716b52d5051ca"
 dependencies = [
- "num-traits",
-]
-
-[[package]]
-name = "glam"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2c626156a479bfb5a4362c43f5abadd700af33ebc8db068089d9cb92493d6ab"
-dependencies = [
  "bytemuck",
+ "mint",
+ "num-traits",
 ]
 
 [[package]]
@@ -1017,6 +1019,12 @@ name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
+name = "mint"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "162e591484b4b8fe9e1ca16ebf07ab584fdc3334508d76a788cd54d89cfc20dc"
 
 [[package]]
 name = "mio"
@@ -1620,8 +1628,9 @@ dependencies = [
 name = "shaders"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
- "glam 0.20.0",
+ "cfg-if 1.0.0",
+ "crevice",
+ "glam",
  "spirv-std",
 ]
 
@@ -1693,7 +1702,7 @@ version = "0.4.0-alpha.12"
 source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=04146858#04146858ce1fc631717db21071b99b8101e12cda"
 dependencies = [
  "bitflags",
- "glam 0.19.0",
+ "glam",
  "num-traits",
  "spirv-std-macros",
  "spirv-types",
@@ -2180,7 +2189,9 @@ version = "0.0.0"
 dependencies = [
  "async-executor",
  "bytemuck",
+ "cfg-if 1.0.0",
  "cgmath",
+ "crevice",
  "env_logger",
  "futures",
  "log",

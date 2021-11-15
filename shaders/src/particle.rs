@@ -1,178 +1,242 @@
-#[cfg(target_arch = "spirv")]
-// For all the glam maths like trigonometry
-use spirv_std::num_traits::Float;
+#[cfg(not(target_arch = "spirv"))]
+use crevice::std140::AsStd140;
 
-use crate::wrach_glam::glam::{vec2, Vec2};
+use crate::neighbours;
+use crate::world;
+use crate::wrach_glam::glam::{vec2, vec4, Vec2, Vec4};
 
-#[cfg_attr(
-    not(target_arch = "spirv"),
-    derive(bytemuck::Pod, bytemuck::Zeroable, Debug)
-)]
-#[derive(Copy, Clone)]
+use core::f32::consts::PI;
+
+cfg_if::cfg_if! {
+    if #[cfg(not(test))] {
+        pub const INFLUENCE_FACTOR: u32 = 10;
+    } else {
+        pub const INFLUENCE_FACTOR: u32 = 1;
+    }
+}
+const PARTICLE_RADIUS: f32 = 0.01;
+const DEFAULT_VISCOSITY: f32 = 0.0;
+const TIME_STEP: f32 = 0.01;
+const DEFAULT_NUM_SOLVER_SUBSTEPS: usize = 1;
+const UNILATERAL: bool = true;
+const PARTICLE_DIAMETER: f32 = 2.0 * PARTICLE_RADIUS;
+const REST_DENSITY: f32 = 1.0 / (PARTICLE_DIAMETER * PARTICLE_DIAMETER);
+const PARTICLE_INFLUENCE: f32 = 3.0 as f32 * PARTICLE_RADIUS; // kernel radius
+const H2: f32 = PARTICLE_INFLUENCE * PARTICLE_INFLUENCE;
+const KERNEL_SCALE: f32 = 4.0 / (PI * H2 * H2 * H2 * H2); // 2d poly6 (SPH based shallow water simulation)
+const MAX_VEL: f32 = 0.4 * PARTICLE_RADIUS;
+
+const DT: f32 = TIME_STEP / DEFAULT_NUM_SOLVER_SUBSTEPS as f32;
+
+pub type ParticleID = u32;
+pub const NO_PARTICLE_ID: ParticleID = 0;
+
+// Field order matters!! Because of std140, wgpu, spirv, etc
+#[cfg_attr(not(target_arch = "spirv"), derive(AsStd140, Debug))]
+#[derive(Default, Copy, Clone)]
 #[repr(C)]
-pub struct Particle {
+pub struct ParticleBasic {
+    pub color: Vec4,
     pub position: Vec2,
     pub velocity: Vec2,
+    pub gradient: Vec2,
+}
+
+impl ParticleBasic {
+    fn to_current_particle(
+        &self,
+        id: ParticleID,
+        neighbours: neighbours::NeighbouringParticles,
+    ) -> CurrentParticle {
+        CurrentParticle::new(id, *self, neighbours)
+    }
+    pub fn update(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
+        let mut current_particle = self.to_current_particle(id, neighbours);
+        current_particle.compute();
+        self.position = current_particle.particle.position;
+        self.velocity = current_particle.particle.velocity;
+        self.gradient = current_particle.particle.gradient;
+        self.color = current_particle.particle.color;
+    }
+}
+
+#[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
+#[derive(Default, Clone, Copy)]
+pub struct Particle {
+    pub id: ParticleID,
+    pub position: Vec2,
+    pub previous: Vec2,
+    pub velocity: Vec2,
+    pub gradient: Vec2,
+    pub color: Vec4,
 }
 
 impl Particle {
-    const SIZE: f32 = 0.1;
-    const E: f32 = 0.00001;
-
-    pub fn force(&self, other: Particle) -> Vec2 {
-        let distance = self.distance(other);
-        let ratio: f32;
-        if distance >= Particle::SIZE {
-            ratio = Particle::SIZE / distance;
-        } else {
-            ratio = 1.0;
-        }
-        // ratio = Particle::SIZE / distance;
-
-        let attraction = ratio.powf(12.0);
-        let repulsion = ratio.powf(6.0);
-        let energy = Particle::E * (attraction - repulsion);
-
-        let mut force = (2.0 * energy).abs().sqrt();
-        if energy < 0.0 {
-            force = -force;
-        }
-
-        let angle = self.angle(other);
-        let mut force_x = angle.cos();
-        if self.position.x < other.position.x {
-            force_x = -force_x;
-        }
-        let mut force_y = angle.sin();
-        if self.position.y < other.position.y {
-            force_y = -force_y;
-        }
-        return vec2(force_x, force_y) * force;
-    }
-
-    pub fn distance(&self, other: Particle) -> f32 {
-        self.position.distance(other.position)
-    }
-
-    pub fn angle(&self, other: Particle) -> f32 {
-        let x_distance = self.position.x - other.position.x;
-        let y_distance = self.position.y - other.position.y;
-        let ratio = y_distance / x_distance;
-        let angle = ratio.atan();
-        angle
-    }
-
-    pub fn bounce_off_walls(&mut self) {
-        if self.position.x < -1.0 {
-            self.velocity.x *= -1.0;
-        }
-        if self.position.x > 1.0 {
-            self.velocity.x *= -1.0;
-        }
-        if self.position.y < -1.0 {
-            self.velocity.y *= -1.0;
-        }
-        if self.position.y > 1.0 {
-            self.velocity.y *= -1.0;
+    pub fn new(id: ParticleID, particle_basic: ParticleBasic) -> Particle {
+        Particle {
+            id,
+            position: particle_basic.position,
+            velocity: particle_basic.velocity,
+            gradient: particle_basic.gradient,
+            color: particle_basic.color,
+            previous: Default::default(),
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    const MIN_FORCE: f32 = 1.0e-7;
-    const ZEROISH_FORCE: f32 = 1.0e-13;
-
-    macro_rules! is_zeroish_force {
-        ($force:expr) => {
-            assert!(
-                $force.abs() < ZEROISH_FORCE,
-                "force is not zeroish {:?}",
-                $force
-            );
-        };
+pub trait ParticleaAsPixel {
+    fn pixel_position(&self) -> Vec2 {
+        vec2(0.0, 0.0)
     }
-
-    macro_rules! is_positive_force {
-        ($force:expr) => {
-            assert!(
-                $force > 0.0 && $force > MIN_FORCE,
-                "force is not positive {:?}",
-                $force
-            );
-        };
+    fn scale(&self, position: f32, scale: u32) -> f32 {
+        ((position + 1.0) / 2.0) * (scale - 1) as f32
     }
+}
 
-    macro_rules! is_negative_force {
-        ($force:expr) => {
-            assert!(
-                $force < 0.0 && $force < -MIN_FORCE,
-                "force is not negative {:?}",
-                $force
-            );
-        };
+// TODO: is there a way to de-duplicate these?
+impl ParticleaAsPixel for Particle {
+    fn pixel_position(&self) -> Vec2 {
+        vec2(
+            self.scale(self.position.x, world::MAP_WIDTH),
+            self.scale(self.position.y, world::MAP_HEIGHT),
+        )
     }
+}
+impl ParticleaAsPixel for ParticleBasic {
+    fn pixel_position(&self) -> Vec2 {
+        vec2(
+            self.scale(self.position.x, world::MAP_WIDTH),
+            self.scale(self.position.y, world::MAP_HEIGHT),
+        )
+    }
+}
 
-    fn top_left() -> Particle {
-        Particle {
-            position: vec2(0.0, 1.0),
-            velocity: vec2(0.0, 0.0),
+pub type Particles = [ParticleBasic; world::NUM_PARTICLES];
+
+#[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
+pub struct CurrentParticle {
+    pub particle: Particle,
+    pub neighbours: neighbours::NeighbouringParticles,
+}
+
+impl CurrentParticle {
+    pub fn new(
+        id: ParticleID,
+        particle_basic: ParticleBasic,
+        neighbours: neighbours::NeighbouringParticles,
+    ) -> CurrentParticle {
+        CurrentParticle {
+            particle: Particle::new(id, particle_basic),
+            neighbours,
         }
     }
 
-    fn top_right() -> Particle {
-        Particle {
-            position: vec2(1.0, 1.0),
-            velocity: vec2(0.0, 0.0),
+    pub fn compute(&mut self) {
+        for _ in 0..DEFAULT_NUM_SOLVER_SUBSTEPS {
+            // predict
+            self.particle.velocity += world::G * DT;
+            self.particle.previous = self.particle.position;
+            self.particle.position += self.particle.velocity * DT;
+
+            // solve
+            self.solve_fluid();
+
+            // derive velocities
+            let mut v = self.particle.position - self.particle.previous;
+            let vel = v.length();
+
+            // CFL
+            if vel > MAX_VEL {
+                v *= MAX_VEL / vel;
+                self.particle.position = self.particle.previous + v;
+            }
+            self.particle.velocity = v / DT;
+            self.apply_viscosity();
+            self.solve_boundaries();
         }
     }
 
-    fn _centre() -> Particle {
-        Particle {
-            position: vec2(0.5, 0.5),
-            velocity: vec2(0.0, 0.0),
+    fn solve_boundaries(&mut self) {
+        let p = &mut self.particle.position;
+        let v = &mut self.particle.velocity;
+
+        if p.y <= -1.0 {
+            v.y = -v.y;
+        }
+        if p.y >= 1.0 {
+            v.y = -v.y;
+        }
+        if p.x <= -1.0 {
+            v.x = -v.x;
+        }
+        if p.x >= 1.0 {
+            v.x = -v.x;
+        }
+
+        //         p.y = p.y.clamp(-1.0, 1.0);
+        //
+        //         // left and right bounds
+        //         p.x = p.x.clamp(-1.0, 1.0);
+    }
+
+    fn solve_fluid(&mut self) {
+        let mut rho = 0.0;
+        let mut sum_grad2 = 0.0;
+        let mut grad_i = Vec2::ZERO;
+        self.particle.color = vec4(1.0, 1.0, 1.0, 0.0);
+        for i in 0..self.neighbours.length() {
+            let neighbour = self.neighbours.get_neighbour(i);
+            if neighbour.id == self.particle.id {
+                continue;
+            }
+            let mut n = neighbour.position - self.particle.position;
+            let r = n.length();
+            // normalize
+            if r != 0.0 {
+                n /= r;
+            }
+            if r <= PARTICLE_INFLUENCE {
+                let r2 = r * r;
+                let w = H2 - r2;
+                rho += KERNEL_SCALE * w * w * w;
+                let grad = (KERNEL_SCALE * 3.0 * w * w * (-2.0 * r)) / REST_DENSITY;
+                self.particle.gradient = n * grad;
+                grad_i -= n * grad;
+                sum_grad2 += grad * grad;
+            }
+        }
+
+        let c = rho / REST_DENSITY - 1.0;
+        if UNILATERAL && c < 0.0 {
+            return;
+        }
+
+        self.particle.color = vec4(0.0, 1.0, 0.0, 0.0);
+
+        sum_grad2 += grad_i.length_squared();
+        let lambda = -c / (sum_grad2 + 0.0001);
+        for i in 0..self.neighbours.length() {
+            let neighbour = self.neighbours.get_neighbour(i);
+            let diff: Vec2;
+            if neighbour.id == self.particle.id {
+                diff = lambda * grad_i;
+            } else {
+                // diff = lambda * neighbour.gradient;
+                diff = vec2(0.0, 0.0);
+            }
+            // TODO: applies to neighbour!!!!!!!!!!!!!
+            self.particle.position += diff;
         }
     }
 
-    fn bottom_left() -> Particle {
-        Particle {
-            position: vec2(0.0, 0.0),
-            velocity: vec2(0.0, 0.0),
+    fn apply_viscosity(&mut self) {
+        let mut avg_vel = Vec2::ZERO;
+        for i in 0..self.neighbours.length() {
+            let neighbour = self.neighbours.get_neighbour(i);
+            avg_vel += neighbour.velocity;
         }
-    }
-    fn _bottom_right() -> Particle {
-        Particle {
-            position: vec2(1.0, 0.0),
-            velocity: vec2(0.0, 0.0),
-        }
-    }
-
-    #[test]
-    fn it_calculates_the_force_between_particles() {
-        let force = top_left().force(top_right());
-        is_positive_force!(force.x);
-        is_zeroish_force!(force.y);
-
-        let force = top_right().force(top_left());
-        is_negative_force!(force.x);
-        is_zeroish_force!(force.y);
-
-        let force = top_left().force(bottom_left());
-        is_zeroish_force!(force.x);
-        is_negative_force!(force.y);
-
-        let force = bottom_left().force(top_right());
-        let bltrx = force.x;
-        let bltry = force.y;
-        is_positive_force!(force.x);
-        is_positive_force!(force.y);
-
-        let force = top_right().force(bottom_left());
-        is_negative_force!(force.x);
-        is_negative_force!(force.y);
-
-        assert_eq!(bltrx, -force.x);
-        assert_eq!(bltry, -force.y);
+        avg_vel /= self.neighbours.length() as f32;
+        let delta = avg_vel - self.particle.velocity;
+        self.particle.velocity += DEFAULT_VISCOSITY * delta;
     }
 }

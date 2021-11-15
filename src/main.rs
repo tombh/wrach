@@ -1,16 +1,13 @@
-use rand::{
-    distributions::{Distribution, Uniform},
-    SeedableRng,
-};
+use bytemuck;
+use crevice::std140::AsStd140;
 use wgpu::util::DeviceExt;
 
 mod framework;
 
-use shaders::compute::Particle;
-use shaders::wrach_glam::glam::vec2;
+use shaders::particle::ParticleBasic;
+use shaders::wrach_glam::glam::{vec2, vec4};
 
-const NUM_PARTICLES: u32 = shaders::compute::NUM_PARTICLES as u32;
-const STARTING_VELOCITY: f32 = 0.00001;
+const NUM_PARTICLES: u32 = shaders::world::NUM_PARTICLES as u32;
 
 // number of single-particle calculations (invocations) in each gpu work group
 const PARTICLES_PER_GROUP: u32 = 64;
@@ -20,6 +17,7 @@ struct Example {
     particle_bind_groups: Vec<wgpu::BindGroup>,
     particle_buffers: Vec<wgpu::Buffer>,
     vertices_buffer: wgpu::Buffer,
+    pixel_map_buffer: wgpu::Buffer,
     pre_compute_pipeline: wgpu::ComputePipeline,
     compute_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
@@ -30,6 +28,10 @@ struct Example {
 impl framework::Example for Example {
     fn required_limits() -> wgpu::Limits {
         wgpu::Limits::downlevel_defaults()
+    }
+
+    fn required_features() -> wgpu::Features {
+        wgpu::Features::CLEAR_COMMANDS
     }
 
     fn required_downlevel_capabilities() -> wgpu::DownlevelCapabilities {
@@ -67,6 +69,9 @@ impl framework::Example for Example {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        let sizeof_particle = std::mem::size_of::<shaders::particle::Std140ParticleBasic>();
+        let sizeof_particle_buffer = (sizeof_particle * NUM_PARTICLES as usize) as u64;
+
         // create compute bind layout group and compute pipeline layout
         let compute_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -93,7 +98,7 @@ impl framework::Example for Example {
                             // storage class Storage { access: LOAD } doesn't match the shader Storage { access: LOAD | STORE }
                             ty: wgpu::BufferBindingType::Storage { read_only: false },
                             has_dynamic_offset: false,
-                            min_binding_size: wgpu::BufferSize::new((NUM_PARTICLES * 16) as _),
+                            min_binding_size: wgpu::BufferSize::new(sizeof_particle_buffer),
                         },
                         count: None,
                     },
@@ -103,7 +108,7 @@ impl framework::Example for Example {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Storage { read_only: false },
                             has_dynamic_offset: false,
-                            min_binding_size: wgpu::BufferSize::new((NUM_PARTICLES * 16) as _),
+                            min_binding_size: wgpu::BufferSize::new(sizeof_particle_buffer),
                         },
                         count: None,
                     },
@@ -114,7 +119,7 @@ impl framework::Example for Example {
                             ty: wgpu::BufferBindingType::Storage { read_only: false },
                             has_dynamic_offset: false,
                             min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<
-                                shaders::compute::PixelMap,
+                                shaders::world::PixelMapBasic,
                             >()
                                 as u64),
                         },
@@ -146,14 +151,17 @@ impl framework::Example for Example {
                 entry_point: "main_vs",
                 buffers: &[
                     wgpu::VertexBufferLayout {
-                        array_stride: 4 * 4,
+                        array_stride: std::mem::size_of::<shaders::particle::Std140ParticleBasic>()
+                            as u64,
                         step_mode: wgpu::VertexStepMode::Instance,
-                        attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2],
+                        attributes: &wgpu::vertex_attr_array![
+                            0 => Float32x4, 1 => Float32x2, 2 => Float32x2, 3 => Float32x2
+                        ],
                     },
                     wgpu::VertexBufferLayout {
-                        array_stride: 2 * 4,
+                        array_stride: 1 * 8,
                         step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![2 => Float32x2],
+                        attributes: &wgpu::vertex_attr_array![4 => Float32x2],
                     },
                 ],
             },
@@ -192,7 +200,7 @@ impl framework::Example for Example {
             -0.01, -0.01, 0.01, 0.01, 0.01, -0.01,
         ]
         .iter()
-        .map(|x| 0.3 * x)
+        .map(|x| 0.6 * x)
         .collect();
         let mut square = [0.0; 12];
         for i in 0..12 {
@@ -205,15 +213,35 @@ impl framework::Example for Example {
         });
 
         // Buffer for all particles data of type [(posx,posy,velx,vely),...]
-        let mut initial_particle_data: Vec<Particle> = Vec::new();
-        let mut rng = rand::rngs::StdRng::from_entropy();
-        let unif = Uniform::new_inclusive(-1.0, 1.0);
-        for _ in 0..NUM_PARTICLES {
-            let particle = Particle {
-                position: vec2(unif.sample(&mut rng), unif.sample(&mut rng)),
-                velocity: vec2(unif.sample(&mut rng), unif.sample(&mut rng)) * STARTING_VELOCITY,
-            };
-            initial_particle_data.push(particle)
+        let mut initial_particle_data: Vec<shaders::particle::Std140ParticleBasic> = Vec::new();
+        let mut count = 0;
+        let mut x = 0.0;
+        let mut y = 0.0;
+        let spacing = 0.02;
+
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        loop {
+            for _ in 0..10 {
+                let particle = ParticleBasic {
+                    color: vec4(1.0, 1.0, 1.0, 1.0),
+                    position: vec2(x, y),
+                    velocity: vec2(rng.gen_range(-0.01, 0.01), 0.0),
+                    gradient: vec2(1.0, 1.0),
+                };
+                initial_particle_data.push(particle.as_std140());
+                count += 1;
+                if count > NUM_PARTICLES {
+                    break;
+                }
+                x += spacing;
+            }
+            y += spacing;
+            x = 0.0;
+            if count > NUM_PARTICLES {
+                break;
+            }
         }
 
         let mut particle_buffers = Vec::<wgpu::Buffer>::new();
@@ -230,7 +258,7 @@ impl framework::Example for Example {
             );
         }
 
-        let pixel_map: shaders::compute::PixelMap = [0; shaders::compute::MAP_SIZE];
+        let pixel_map: shaders::world::PixelMapBasic = [0; shaders::world::MAP_SIZE];
         let pixel_map_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Pixel Map")),
             contents: bytemuck::cast_slice(&pixel_map),
@@ -273,6 +301,7 @@ impl framework::Example for Example {
             particle_bind_groups,
             particle_buffers,
             vertices_buffer,
+            pixel_map_buffer,
             pre_compute_pipeline,
             compute_pipeline,
             render_pipeline,
@@ -324,17 +353,21 @@ impl framework::Example for Example {
         let mut command_encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
+        command_encoder.clear_buffer(&self.pixel_map_buffer, 0, None);
+
         command_encoder.push_debug_group("main compute");
         {
-            // compute pass
             let mut cpass =
                 command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
-            cpass.set_pipeline(&self.pre_compute_pipeline);
             cpass.set_bind_group(0, &self.particle_bind_groups[self.frame_num % 2], &[]);
+
+            // pre-compute pass
+            cpass.set_pipeline(&self.pre_compute_pipeline);
             cpass.dispatch(self.work_group_count, 1, 1);
 
+            // compute pass
+            // cpass.set_bind_group(0, &self.particle_bind_groups[self.frame_num % 2], &[]);
             cpass.set_pipeline(&self.compute_pipeline);
-            cpass.set_bind_group(0, &self.particle_bind_groups[self.frame_num % 2], &[]);
             cpass.dispatch(self.work_group_count, 1, 1);
         }
         command_encoder.pop_debug_group();

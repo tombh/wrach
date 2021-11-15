@@ -6,29 +6,6 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
 };
 
-#[rustfmt::skip]
-#[allow(unused)]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.5, 0.0,
-    0.0, 0.0, 0.5, 1.0,
-);
-
-#[allow(dead_code)]
-pub fn cast_slice<T>(data: &[T]) -> &[u8] {
-    use std::{mem::size_of, slice::from_raw_parts};
-
-    unsafe { from_raw_parts(data.as_ptr() as *const u8, data.len() * size_of::<T>()) }
-}
-
-#[allow(dead_code)]
-pub enum ShaderStage {
-    Vertex,
-    Fragment,
-    Compute,
-}
-
 pub trait Example: 'static + Sized {
     fn optional_features() -> wgpu::Features {
         wgpu::Features::empty()
@@ -91,8 +68,8 @@ async fn setup<E: Example>(title: &str) -> Setup {
     builder = builder
         .with_title(title)
         .with_inner_size(winit::dpi::PhysicalSize::new(
-            shaders::compute::MAP_WIDTH,
-            shaders::compute::MAP_HEIGHT,
+            shaders::world::MAP_WIDTH,
+            shaders::world::MAP_HEIGHT,
         ));
     #[cfg(windows_OFF)] // TODO
     {
