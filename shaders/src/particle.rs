@@ -9,12 +9,14 @@ use core::f32::consts::PI;
 
 cfg_if::cfg_if! {
     if #[cfg(not(test))] {
-        pub const INFLUENCE_FACTOR: u32 = 10;
+        pub const INFLUENCE_FACTOR: u32 = 3;
     } else {
         pub const INFLUENCE_FACTOR: u32 = 1;
     }
 }
-const PARTICLE_RADIUS: f32 = 0.01;
+
+pub const PIXEL_SIZE: f32 = 2.0 / world::MAP_WIDTH as f32;
+pub const PARTICLE_RADIUS: f32 = PIXEL_SIZE / 2.0;
 const DEFAULT_VISCOSITY: f32 = 0.0;
 const TIME_STEP: f32 = 0.01;
 const DEFAULT_NUM_SOLVER_SUBSTEPS: usize = 1;
@@ -39,7 +41,7 @@ pub struct ParticleBasic {
     pub color: Vec4,
     pub position: Vec2,
     pub velocity: Vec2,
-    pub gradient: Vec2,
+    pub lambda: f32,
 }
 
 impl ParticleBasic {
@@ -55,7 +57,7 @@ impl ParticleBasic {
         current_particle.compute();
         self.position = current_particle.particle.position;
         self.velocity = current_particle.particle.velocity;
-        self.gradient = current_particle.particle.gradient;
+        self.lambda = current_particle.particle.lambda;
         self.color = current_particle.particle.color;
     }
 }
@@ -67,7 +69,7 @@ pub struct Particle {
     pub position: Vec2,
     pub previous: Vec2,
     pub velocity: Vec2,
-    pub gradient: Vec2,
+    pub lambda: f32,
     pub color: Vec4,
 }
 
@@ -77,7 +79,7 @@ impl Particle {
             id,
             position: particle_basic.position,
             velocity: particle_basic.velocity,
-            gradient: particle_basic.gradient,
+            lambda: particle_basic.lambda,
             color: particle_basic.color,
             previous: Default::default(),
         }
@@ -97,16 +99,16 @@ pub trait ParticleaAsPixel {
 impl ParticleaAsPixel for Particle {
     fn pixel_position(&self) -> Vec2 {
         vec2(
-            self.scale(self.position.x, world::MAP_WIDTH),
-            self.scale(self.position.y, world::MAP_HEIGHT),
+            self.scale(self.position.x, neighbours::GRID_WIDTH),
+            self.scale(self.position.y, neighbours::GRID_HEIGHT),
         )
     }
 }
 impl ParticleaAsPixel for ParticleBasic {
     fn pixel_position(&self) -> Vec2 {
         vec2(
-            self.scale(self.position.x, world::MAP_WIDTH),
-            self.scale(self.position.y, world::MAP_HEIGHT),
+            self.scale(self.position.x, neighbours::GRID_WIDTH),
+            self.scale(self.position.y, neighbours::GRID_HEIGHT),
         )
     }
 }
@@ -132,51 +134,49 @@ impl CurrentParticle {
     }
 
     pub fn compute(&mut self) {
-        for _ in 0..DEFAULT_NUM_SOLVER_SUBSTEPS {
-            // predict
-            self.particle.velocity += world::G * DT;
-            self.particle.previous = self.particle.position;
-            self.particle.position += self.particle.velocity * DT;
+        // predict
+        self.particle.velocity += world::G * DT;
+        self.particle.previous = self.particle.position;
+        self.particle.position += self.particle.velocity * DT;
 
-            // solve
-            self.solve_fluid();
+        // solve
+        self.solve_fluid();
 
-            // derive velocities
-            let mut v = self.particle.position - self.particle.previous;
-            let vel = v.length();
+        // derive velocities
+        let mut v = self.particle.position - self.particle.previous;
+        let vel = v.length();
 
-            // CFL
-            if vel > MAX_VEL {
-                v *= MAX_VEL / vel;
-                self.particle.position = self.particle.previous + v;
-            }
-            self.particle.velocity = v / DT;
-            self.apply_viscosity();
-            self.solve_boundaries();
+        // CFL
+        if vel > MAX_VEL {
+            v *= MAX_VEL / vel;
+            self.particle.position = self.particle.previous + v;
         }
+        self.particle.velocity = v / DT;
+        self.apply_viscosity();
+        self.solve_boundaries();
     }
 
     fn solve_boundaries(&mut self) {
         let p = &mut self.particle.position;
-        let v = &mut self.particle.velocity;
+        // let v = &mut self.particle.velocity;
 
-        if p.y <= -1.0 {
-            v.y = -v.y;
-        }
-        if p.y >= 1.0 {
-            v.y = -v.y;
-        }
-        if p.x <= -1.0 {
-            v.x = -v.x;
-        }
-        if p.x >= 1.0 {
-            v.x = -v.x;
-        }
-
-        //         p.y = p.y.clamp(-1.0, 1.0);
+        // if p.y <= -1.0 {
+        //     v.y = -v.y;
+        // }
+        // if p.y >= 1.0 {
+        //     v.y = -v.y;
+        // }
+        // if p.x <= -1.0 {
+        //     v.x = -v.x;
+        // }
+        // if p.x >= 1.0 {
+        //     v.x = -v.x;
+        // }
         //
-        //         // left and right bounds
-        //         p.x = p.x.clamp(-1.0, 1.0);
+        let wall = 0.95;
+
+        p.y = p.y.clamp(-wall, wall);
+        p.x = p.x.clamp(-wall, wall);
     }
 
     fn solve_fluid(&mut self) {
@@ -190,17 +190,20 @@ impl CurrentParticle {
                 continue;
             }
             let mut n = neighbour.position - self.particle.position;
+            let mut ni = self.particle.position - neighbour.position;
             let r = n.length();
             // normalize
             if r != 0.0 {
                 n /= r;
+                ni /= r;
             }
             if r <= PARTICLE_INFLUENCE {
+                self.particle.color = vec4(0.0, 1.0, 0.0, 0.0);
                 let r2 = r * r;
                 let w = H2 - r2;
                 rho += KERNEL_SCALE * w * w * w;
                 let grad = (KERNEL_SCALE * 3.0 * w * w * (-2.0 * r)) / REST_DENSITY;
-                self.particle.gradient = n * grad;
+                self.particle.position += neighbour.lambda * (ni * grad);
                 grad_i -= n * grad;
                 sum_grad2 += grad * grad;
             }
@@ -211,22 +214,10 @@ impl CurrentParticle {
             return;
         }
 
-        self.particle.color = vec4(0.0, 1.0, 0.0, 0.0);
-
         sum_grad2 += grad_i.length_squared();
         let lambda = -c / (sum_grad2 + 0.0001);
-        for i in 0..self.neighbours.length() {
-            let neighbour = self.neighbours.get_neighbour(i);
-            let diff: Vec2;
-            if neighbour.id == self.particle.id {
-                diff = lambda * grad_i;
-            } else {
-                // diff = lambda * neighbour.gradient;
-                diff = vec2(0.0, 0.0);
-            }
-            // TODO: applies to neighbour!!!!!!!!!!!!!
-            self.particle.position += diff;
-        }
+        self.particle.position += lambda * grad_i;
+        self.particle.lambda = lambda;
     }
 
     fn apply_viscosity(&mut self) {

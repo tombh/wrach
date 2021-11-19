@@ -68,8 +68,8 @@ async fn setup<E: Example>(title: &str) -> Setup {
     builder = builder
         .with_title(title)
         .with_inner_size(winit::dpi::PhysicalSize::new(
-            shaders::world::MAP_WIDTH,
-            shaders::world::MAP_HEIGHT,
+            shaders::world::MAP_WIDTH * 4,
+            shaders::world::MAP_HEIGHT * 4,
         ));
     #[cfg(windows_OFF)] // TODO
     {

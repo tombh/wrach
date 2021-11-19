@@ -10,6 +10,10 @@ const INFLUENCE_ROW_SIZE: usize = ((particle::INFLUENCE_FACTOR * 2) + 1) as usiz
 type NeighbourhoodRow = [particle::Particle; INFLUENCE_ROW_SIZE];
 type Neighbourhood = [NeighbourhoodRow; INFLUENCE_ROW_SIZE];
 
+const RESOLUTION: u32 = 1;
+pub const GRID_WIDTH: u32 = world::MAP_WIDTH * RESOLUTION;
+pub const GRID_HEIGHT: u32 = world::MAP_HEIGHT * RESOLUTION;
+
 #[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
 #[derive(Copy, Clone)]
 pub struct NeighbouringParticles {
@@ -61,7 +65,7 @@ impl NeighbouringParticles {
     }
 
     fn linear_pixel_coord(x: u32, y: u32) -> usize {
-        ((y * world::MAP_WIDTH as u32) + x) as usize
+        ((y * GRID_WIDTH as u32) + x) as usize
     }
 
     fn search_area_of_influence(
@@ -70,8 +74,8 @@ impl NeighbouringParticles {
         particles: &mut particle::Particles,
     ) {
         self.count = 0;
-        let (x_min, x_max) = Self::range(self.particle.pixel_position().x, world::MAP_WIDTH);
-        let (y_min, y_max) = Self::range(self.particle.pixel_position().y, world::MAP_HEIGHT);
+        let (x_min, x_max) = Self::range(self.particle.pixel_position().x, GRID_WIDTH);
+        let (y_min, y_max) = Self::range(self.particle.pixel_position().y, GRID_HEIGHT);
         for y in y_min..(y_max + 1) {
             for x in x_min..(x_max + 1) {
                 self.check_pixel(x, y, map, particles);

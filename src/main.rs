@@ -193,14 +193,15 @@ impl framework::Example for Example {
         });
 
         // A square made of 2 triangles
+        #[rustfmt::skip]
         let vertex_buffer_data: Vec<f32> = [
             // First triangle ----------------------
-            -0.01, -0.01, -0.01, 0.01, 0.01, 0.01,
+            -1, -1, -1, 1, 1, 1,
             // Second triangle ----------------------
-            -0.01, -0.01, 0.01, 0.01, 0.01, -0.01,
+            -1, -1, 1, 1, 1, -1,
         ]
         .iter()
-        .map(|x| 0.6 * x)
+        .map(|x| 0.5 * shaders::particle::PIXEL_SIZE * (*x as f32))
         .collect();
         let mut square = [0.0; 12];
         for i in 0..12 {
@@ -215,20 +216,24 @@ impl framework::Example for Example {
         // Buffer for all particles data of type [(posx,posy,velx,vely),...]
         let mut initial_particle_data: Vec<shaders::particle::Std140ParticleBasic> = Vec::new();
         let mut count = 0;
-        let mut x = 0.0;
-        let mut y = 0.0;
-        let spacing = 0.02;
+        let mut x = -0.9;
+        let mut y = -0.9;
+        let spacing = 1.0 * shaders::particle::PIXEL_SIZE;
 
         use rand::Rng;
         let mut rng = rand::thread_rng();
+        let jitter = 0.01;
 
         loop {
-            for _ in 0..10 {
+            loop {
                 let particle = ParticleBasic {
                     color: vec4(1.0, 1.0, 1.0, 1.0),
-                    position: vec2(x, y),
-                    velocity: vec2(rng.gen_range(-0.01, 0.01), 0.0),
-                    gradient: vec2(1.0, 1.0),
+                    position: vec2(x, y) * (1.0 + rng.gen_range(-jitter, jitter)),
+                    velocity: vec2(
+                        rng.gen_range(-jitter, jitter),
+                        rng.gen_range(-jitter, jitter),
+                    ),
+                    lambda: 0.0,
                 };
                 initial_particle_data.push(particle.as_std140());
                 count += 1;
@@ -236,9 +241,12 @@ impl framework::Example for Example {
                     break;
                 }
                 x += spacing;
+                if x > 0.9 {
+                    break;
+                }
             }
             y += spacing;
-            x = 0.0;
+            x = -0.9;
             if count > NUM_PARTICLES {
                 break;
             }
