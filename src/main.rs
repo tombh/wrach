@@ -5,6 +5,7 @@ use wgpu::util::DeviceExt;
 mod framework;
 
 use shaders::particle::ParticleBasic;
+use shaders::particle::ParticleGridStartID;
 use shaders::wrach_glam::glam::{vec2, vec4};
 
 const NUM_PARTICLES: u32 = shaders::world::NUM_PARTICLES as u32;
@@ -17,12 +18,16 @@ struct Example {
     particle_bind_groups: Vec<wgpu::BindGroup>,
     particle_buffers: Vec<wgpu::Buffer>,
     vertices_buffer: wgpu::Buffer,
-    pixel_map_buffer: wgpu::Buffer,
+    grid_buffer: wgpu::Buffer,
     pre_compute_pipeline: wgpu::ComputePipeline,
+    predict_compute_pipeline: wgpu::ComputePipeline,
     compute_pipeline: wgpu::ComputePipeline,
+    post_compute_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
     work_group_count: u32,
     frame_num: usize,
+    bind_group: usize,
+    is_paused: bool,
 }
 
 impl framework::Example for Example {
@@ -41,6 +46,10 @@ impl framework::Example for Example {
         }
     }
 
+    fn toggle_pause(&mut self) {
+        self.is_paused = !self.is_paused;
+    }
+
     /// constructs initial instance of Example struct
     fn init(
         config: &wgpu::SurfaceConfiguration,
@@ -54,13 +63,11 @@ impl framework::Example for Example {
         // buffer for simulation parameters uniform
 
         let sim_param_data = [
-            0.04f32, // deltaT
-            0.1,     // rule1Distance
-            0.025,   // rule2Distance
-            0.025,   // rule3Distance
-            0.02,    // rule1Scale
-            0.05,    // rule2Scale
-            0.005,   // rule3Scale
+            0.0f32, // stage
+            0.0,    // stage
+            0.0,    // stage
+            0.0,    // stage
+            0.0,    // stage
         ]
         .to_vec();
         let sim_param_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -119,7 +126,7 @@ impl framework::Example for Example {
                             ty: wgpu::BufferBindingType::Storage { read_only: false },
                             has_dynamic_offset: false,
                             min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<
-                                shaders::world::PixelMapBasic,
+                                shaders::neighbours::GridBasic,
                             >()
                                 as u64),
                         },
@@ -185,12 +192,30 @@ impl framework::Example for Example {
             });
 
         // Create compute pipeline
+        let predict_compute_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Predict compute pipeline"),
+                layout: Some(&compute_pipeline_layout),
+                module: &shader_module,
+                entry_point: "predict_main_cs",
+            });
+
+        // Create compute pipeline
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Compute pipeline"),
             layout: Some(&compute_pipeline_layout),
             module: &shader_module,
             entry_point: "main_cs",
         });
+
+        // Create post-compute pipeline
+        let post_compute_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Post-compute pipeline"),
+                layout: Some(&compute_pipeline_layout),
+                module: &shader_module,
+                entry_point: "post_main_cs",
+            });
 
         // A square made of 2 triangles
         #[rustfmt::skip]
@@ -216,9 +241,10 @@ impl framework::Example for Example {
         // Buffer for all particles data of type [(posx,posy,velx,vely),...]
         let mut initial_particle_data: Vec<shaders::particle::Std140ParticleBasic> = Vec::new();
         let mut count = 0;
-        let mut x = -0.9;
-        let mut y = -0.9;
-        let spacing = 1.0 * shaders::particle::PIXEL_SIZE;
+        let x_min = -0.0;
+        let mut x = x_min;
+        let mut y = -0.4;
+        let spacing = 2.0 * shaders::particle::PARTICLE_RADIUS;
 
         use rand::Rng;
         let mut rng = rand::thread_rng();
@@ -226,15 +252,19 @@ impl framework::Example for Example {
 
         loop {
             loop {
-                let particle = ParticleBasic {
+                let position = vec2(x, y); // * (1.0 + rng.gen_range(-jitter, jitter));
+                let mut particle = ParticleBasic {
                     color: vec4(1.0, 1.0, 1.0, 1.0),
-                    position: vec2(x, y) * (1.0 + rng.gen_range(-jitter, jitter)),
+                    position,
+                    previous: position,
+                    pre_fluid_position: position,
                     velocity: vec2(
                         rng.gen_range(-jitter, jitter),
                         rng.gen_range(-jitter, jitter),
                     ),
-                    lambda: 0.0,
+                    ..Default::default()
                 };
+                particle.grid_start_index = particle.grid_start_index();
                 initial_particle_data.push(particle.as_std140());
                 count += 1;
                 if count > NUM_PARTICLES {
@@ -246,7 +276,7 @@ impl framework::Example for Example {
                 }
             }
             y += spacing;
-            x = -0.9;
+            x = x_min;
             if count > NUM_PARTICLES {
                 break;
             }
@@ -266,10 +296,11 @@ impl framework::Example for Example {
             );
         }
 
-        let pixel_map: shaders::world::PixelMapBasic = [0; shaders::world::MAP_SIZE];
-        let pixel_map_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let grid: shaders::neighbours::GridBasic =
+            [0; shaders::neighbours::TOTAL_GRID_STORAGE_SIZE];
+        let grid_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Pixel Map")),
-            contents: bytemuck::cast_slice(&pixel_map),
+            contents: bytemuck::cast_slice(&grid),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -293,7 +324,7 @@ impl framework::Example for Example {
                     },
                     wgpu::BindGroupEntry {
                         binding: 3,
-                        resource: pixel_map_buffer.as_entire_binding(),
+                        resource: grid_buffer.as_entire_binding(),
                     },
                 ],
                 label: None,
@@ -309,12 +340,16 @@ impl framework::Example for Example {
             particle_bind_groups,
             particle_buffers,
             vertices_buffer,
-            pixel_map_buffer,
+            grid_buffer,
             pre_compute_pipeline,
+            predict_compute_pipeline,
             compute_pipeline,
+            post_compute_pipeline,
             render_pipeline,
             work_group_count,
             frame_num: 0,
+            bind_group: 0,
+            is_paused: false,
         }
     }
 
@@ -361,32 +396,73 @@ impl framework::Example for Example {
         let mut command_encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        command_encoder.clear_buffer(&self.pixel_map_buffer, 0, None);
+        command_encoder.clear_buffer(&self.grid_buffer, 0, None);
 
-        command_encoder.push_debug_group("main compute");
-        {
+        command_encoder.push_debug_group("compute");
+        if !self.is_paused {
             let mut cpass =
                 command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
-            cpass.set_bind_group(0, &self.particle_bind_groups[self.frame_num % 2], &[]);
 
-            // pre-compute pass
+            // neighbours
+            if self.bind_group == 0 {
+                self.bind_group = 1;
+            } else {
+                self.bind_group = 0;
+            }
+            cpass.set_bind_group(0, &self.particle_bind_groups[self.bind_group], &[]);
             cpass.set_pipeline(&self.pre_compute_pipeline);
-            cpass.dispatch(self.work_group_count, 1, 1);
+            cpass.dispatch(
+                (shaders::neighbours::GRID_COUNT as f32 / 64.0) as u32 + 1,
+                1,
+                1,
+            );
 
-            // compute pass
-            // cpass.set_bind_group(0, &self.particle_bind_groups[self.frame_num % 2], &[]);
-            cpass.set_pipeline(&self.compute_pipeline);
-            cpass.dispatch(self.work_group_count, 1, 1);
+            for _ in 0..shaders::particle::DEFAULT_NUM_SOLVER_SUBSTEPS {
+                // predict pass
+                if self.bind_group == 0 {
+                    self.bind_group = 1;
+                } else {
+                    self.bind_group = 0;
+                }
+                cpass.set_bind_group(0, &self.particle_bind_groups[self.bind_group], &[]);
+                cpass.set_pipeline(&self.predict_compute_pipeline);
+                cpass.dispatch(self.work_group_count, 1, 1);
+
+                // compute pass
+                if self.bind_group == 0 {
+                    self.bind_group = 1;
+                } else {
+                    self.bind_group = 0;
+                }
+                cpass.set_bind_group(0, &self.particle_bind_groups[self.bind_group], &[]);
+                cpass.set_pipeline(&self.compute_pipeline);
+                cpass.dispatch(self.work_group_count, 1, 1);
+
+                // post compute
+                if self.bind_group == 0 {
+                    self.bind_group = 1;
+                } else {
+                    self.bind_group = 0;
+                }
+                cpass.set_bind_group(0, &self.particle_bind_groups[self.bind_group], &[]);
+                cpass.set_pipeline(&self.post_compute_pipeline);
+                cpass.dispatch(self.work_group_count, 1, 1);
+            }
         }
         command_encoder.pop_debug_group();
 
         command_encoder.push_debug_group("render pixels");
         {
+            if self.bind_group == 0 {
+                self.bind_group = 1;
+            } else {
+                self.bind_group = 0;
+            }
             // render pass
             let mut rpass = command_encoder.begin_render_pass(&render_pass_descriptor);
             rpass.set_pipeline(&self.render_pipeline);
             // render dst particles
-            rpass.set_vertex_buffer(0, self.particle_buffers[(self.frame_num + 1) % 2].slice(..));
+            rpass.set_vertex_buffer(0, self.particle_buffers[self.bind_group].slice(..));
             // the three instance-local vertices
             rpass.set_vertex_buffer(1, self.vertices_buffer.slice(..));
             rpass.draw(0..6, 0..NUM_PARTICLES);

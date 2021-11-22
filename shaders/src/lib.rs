@@ -11,7 +11,7 @@
 use spirv_std::macros::spirv;
 
 pub mod compute;
-mod neighbours;
+pub mod neighbours;
 pub mod particle;
 pub mod world;
 pub mod wrach_glam;
@@ -23,11 +23,27 @@ use wrach_glam::glam::{vec4, UVec3, Vec2, Vec4};
 pub fn pre_main_cs(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(uniform, descriptor_set = 0, binding = 0)] _params: &compute::SimParams,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles: &mut particle::Particles,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] _particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] pixel_map: &mut world::PixelMapBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &mut neighbours::GridBasic,
 ) {
-    neighbours::NeighbouringParticles::place_particle_in_pixel(id.x, particles, pixel_map);
+    let grid_id = id.x;
+    if grid_id + 1 > neighbours::GRID_COUNT as u32 {
+        return;
+    }
+    neighbours::NeighbouringParticles::populate_grid(grid_id, particles_src, grid);
+}
+
+#[rustfmt::skip]
+#[spirv(compute(threads(64)))]
+pub fn predict_main_cs(
+    #[spirv(global_invocation_id)] id: UVec3,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] params: &compute::SimParams,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &neighbours::GridBasic,
+) {
+    compute::entry(id, params, particles_src, particles_dst, grid, 0);
 }
 
 #[rustfmt::skip]
@@ -37,9 +53,21 @@ pub fn main_cs(
     #[spirv(uniform, descriptor_set = 0, binding = 0)] params: &compute::SimParams,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] pixel_map: &world::PixelMapBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &neighbours::GridBasic,
 ) {
-    compute::entry(id, params, particles_src, particles_dst, pixel_map);
+    compute::entry(id, params, particles_src, particles_dst, grid, 1);
+}
+
+#[rustfmt::skip]
+#[spirv(compute(threads(64)))]
+pub fn post_main_cs(
+    #[spirv(global_invocation_id)] id: UVec3,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] params: &compute::SimParams,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &neighbours::GridBasic,
+) {
+    compute::entry(id, params, particles_src, particles_dst, grid, 2);
 }
 
 // Called for every index of a vertex, there are 6 in a square, because a square

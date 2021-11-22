@@ -44,6 +44,7 @@ pub trait Example: 'static + Sized {
         queue: &wgpu::Queue,
         spawner: &Spawner,
     );
+    fn toggle_pause(&mut self);
 }
 
 struct Setup {
@@ -68,8 +69,8 @@ async fn setup<E: Example>(title: &str) -> Setup {
     builder = builder
         .with_title(title)
         .with_inner_size(winit::dpi::PhysicalSize::new(
-            shaders::world::MAP_WIDTH * 4,
-            shaders::world::MAP_HEIGHT * 4,
+            shaders::world::MAP_WIDTH * shaders::world::WINDOW_ZOOM,
+            shaders::world::MAP_HEIGHT * shaders::world::WINDOW_ZOOM,
         ));
     #[cfg(windows_OFF)] // TODO
     {
@@ -226,13 +227,14 @@ fn start<E: Example>(
                     let target_frametime = Duration::from_secs_f64(1.0 / 60.0);
                     let time_since_last_frame = last_update_inst.elapsed();
                     if time_since_last_frame >= target_frametime {
-                        window.request_redraw();
+                        // window.request_redraw();
                         last_update_inst = Instant::now();
                     } else {
                         *control_flow = ControlFlow::WaitUntil(
                             Instant::now() + target_frametime - time_since_last_frame,
                         );
                     }
+                    window.request_redraw();
 
                     spawner.run_until_stalled();
                 }
@@ -256,30 +258,33 @@ fn start<E: Example>(
                 surface.configure(&device, &config);
             }
             event::Event::WindowEvent { event, .. } => match event {
-                WindowEvent::KeyboardInput {
-                    input:
-                        event::KeyboardInput {
-                            virtual_keycode: Some(event::VirtualKeyCode::Escape),
-                            state: event::ElementState::Pressed,
-                            ..
-                        },
-                    ..
-                }
-                | WindowEvent::CloseRequested => {
+                WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit;
+                    return;
                 }
-                #[cfg(not(target_arch = "wasm32"))]
                 WindowEvent::KeyboardInput {
                     input:
                         event::KeyboardInput {
-                            virtual_keycode: Some(event::VirtualKeyCode::R),
-                            state: event::ElementState::Pressed,
+                            virtual_keycode: Some(virtual_code),
+                            state,
                             ..
                         },
                     ..
-                } => {
-                    println!("{:#?}", instance.generate_report());
-                }
+                } => match (virtual_code, state) {
+                    (event::VirtualKeyCode::R, event::ElementState::Pressed) => {
+                        println!("R");
+                        #[cfg(not(target_arch = "wasm32"))]
+                        println!("{:#?}", instance.generate_report());
+                    }
+                    (event::VirtualKeyCode::Space, event::ElementState::Pressed) => {
+                        example.toggle_pause();
+                    }
+                    (event::VirtualKeyCode::Escape, event::ElementState::Pressed) => {
+                        *control_flow = ControlFlow::Exit;
+                    }
+                    _ => (),
+                },
+
                 _ => {
                     example.update(event);
                 }
