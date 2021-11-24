@@ -1,33 +1,42 @@
-#[cfg(target_arch = "spirv")]
+/// Here we very crudely place particles in a roughly pixel-sized grid of memory, this
+/// allows us to efficiently find neighbouring particles because we can just add and
+/// subtract to a particle's pixel-grid version of its coords to get access to nearby
+/// particles. This is possible because we're limiting the simulation to pixel-type particles
+/// anyway. Note that `particle::MAX_VEL` helps with this if it less than the size of pixel box.
+/// However this approach is not a fullproof, mainly because it doesn't allow more than one
+/// particle to occupy one of the pixel-sized grid points. There are some tricks
+/// we can do to help though;
+///   * increasing the pixel-grid to have a slightly higher resolution (implemented)
+///   * keeping a history of the pixel-grid (TODO)
+///
+/// If this approach gets too problematic, there's a more traditional approach in commit: ff6a519
+//
+
 // For all the glam maths like trigonometry
+#[cfg(target_arch = "spirv")]
 use spirv_std::num_traits::Float;
 
 use crate::particle;
-use crate::particle::ParticleGridStartID;
+use crate::particle::ParticleaAsPixel;
 use crate::world;
 
-const INFLUENCE_ROW_SIZE: usize = 3;
+const INFLUENCE_ROW_SIZE: usize = ((particle::INFLUENCE_FACTOR * 2) + 1) as usize;
 type NeighbourhoodRow = [particle::Particle; INFLUENCE_ROW_SIZE];
 type Neighbourhood = [NeighbourhoodRow; INFLUENCE_ROW_SIZE];
 
 cfg_if::cfg_if! {
     if #[cfg(not(test))] {
-        const GRID_RESOLUTIONISH: f32 = 3.0;
-        const MAX_PARTICLES_PER_GRID: usize = (GRID_RESOLUTIONISH * GRID_RESOLUTIONISH) as usize * 2;
+        const RESOLUTION: u32 = 2;
     } else {
-        const GRID_RESOLUTIONISH: f32 = 2.0;
-        const MAX_PARTICLES_PER_GRID: usize = 3;
+        const RESOLUTION: u32 = 1;
     }
 }
+pub const GRID_WIDTH: u32 = world::MAP_WIDTH * RESOLUTION;
+pub const GRID_HEIGHT: u32 = world::MAP_HEIGHT * RESOLUTION;
+pub const GRID_SIZE: usize = (GRID_WIDTH * GRID_HEIGHT) as usize;
+pub type PixelMapBasic = [particle::ParticleID; GRID_SIZE];
 
-pub const GRIDS_PER_ROW: u32 = (world::MAP_WIDTH as f32 / GRID_RESOLUTIONISH) as u32 + 1;
-pub const GRIDS_PER_COL: u32 = (world::MAP_HEIGHT as f32 / GRID_RESOLUTIONISH) as u32 + 1;
-pub const GRID_COUNT: usize = (GRIDS_PER_ROW * GRIDS_PER_COL) as usize;
-const PER_GRID_STORAGE_SIZE: usize = MAX_PARTICLES_PER_GRID + 1;
-pub const TOTAL_GRID_STORAGE_SIZE: usize = GRID_COUNT * PER_GRID_STORAGE_SIZE;
-pub type GridBasic = [particle::ParticleID; TOTAL_GRID_STORAGE_SIZE];
-
-pub type GridStartID = u32;
+const NO_PARTICLE_ID: u32 = 0;
 
 #[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
 #[derive(Copy, Clone)]
@@ -48,32 +57,28 @@ impl Default for NeighbouringParticles {
 }
 
 impl NeighbouringParticles {
-    pub fn populate_grid(grid_id: u32, particles: &mut particle::Particles, grid: &mut GridBasic) {
-        let grid_start_index = grid_id * PER_GRID_STORAGE_SIZE as u32;
-        let max_index = grid_start_index as usize + PER_GRID_STORAGE_SIZE;
-        let mut index = grid_start_index;
-        for candidate_id in 0..world::NUM_PARTICLES {
-            let candidate_grid_start_index = particles[candidate_id].grid_start_index;
-            if candidate_grid_start_index == grid_start_index {
-                index += 1;
-                if index < max_index as u32 {
-                    grid[index as usize] = candidate_id as particle::ParticleID;
-                }
-            }
-        }
-
-        let total = index - grid_start_index;
-        grid[grid_start_index as usize] = total;
+    pub fn place_particle_in_pixel(
+        id: particle::ParticleID,
+        particles: &mut particle::Particles,
+        map: &mut PixelMapBasic,
+    ) {
+        let pixel_position = particles[id as usize].pixel_position();
+        let coord = Self::linear_pixel_coord(
+            pixel_position.x.floor() as u32,
+            pixel_position.y.floor() as u32,
+        );
+        // Add 1 because ID 0 is reserved as the empty particle
+        map[coord] = id + 1;
     }
 
     pub fn find(
         id: particle::ParticleID,
-        grid: &GridBasic,
+        map: &PixelMapBasic,
         particles: &mut particle::Particles,
     ) -> NeighbouringParticles {
         let central_particle = particle::Particle::new(id, particles[id as usize]);
         let mut neighbouring = NeighbouringParticles::new(central_particle);
-        neighbouring.search_area_of_influence(grid, particles);
+        neighbouring.search_area_of_influence(map, particles);
         return neighbouring;
     }
 
@@ -83,62 +88,57 @@ impl NeighbouringParticles {
         return neighbouring;
     }
 
-    pub fn grid_coord_to_grid_start_index(x: u32, y: u32) -> GridStartID {
-        ((y * GRIDS_PER_ROW as u32) + x) * PER_GRID_STORAGE_SIZE as u32
+    fn linear_pixel_coord(x: u32, y: u32) -> usize {
+        ((y * GRID_WIDTH as u32) + x) as usize
     }
 
-    fn search_area_of_influence(&mut self, grid: &GridBasic, particles: &mut particle::Particles) {
+    fn search_area_of_influence(
+        &mut self,
+        map: &PixelMapBasic,
+        particles: &mut particle::Particles,
+    ) {
         self.count = 0;
-        let (grid_x, grid_y) = self.particle.grid_coords_from_particle_coords();
-        let (x_min, x_max) = Self::range(grid_x, GRIDS_PER_ROW);
-        let (y_min, y_max) = Self::range(grid_y, GRIDS_PER_COL);
+        let (x_min, x_max) = Self::range(self.particle.pixel_position().x, GRID_WIDTH);
+        let (y_min, y_max) = Self::range(self.particle.pixel_position().y, GRID_HEIGHT);
         for y in y_min..(y_max + 1) {
             for x in x_min..(x_max + 1) {
-                self.check_grid(x, y, grid, particles);
+                self.check_pixel(x, y, map, particles);
             }
         }
-        // for i in 0..world::NUM_PARTICLES {
-        //     let candidate = particles[i];
-        //     let n = candidate.position - self.particle.position;
-        //     if n.length() < particle::PARTICLE_INFLUENCE {
-        //         let neighbour = particle::Particle::new(i as u32, candidate);
-        //         self.store_neighbour(neighbour);
-        //     }
-        // }
     }
 
-    fn range(position: u32, scale: u32) -> (u32, u32) {
-        let scale_as_index = scale as i32 - 1;
-        let mut min: i32 = position as i32 - 1;
-        let mut max: i32 = position as i32 + 1;
-        if min < 0 {
-            min = 0;
-        }
-        if max > scale_as_index {
-            max = scale_as_index;
-        }
+    fn range(pixel_position: f32, scale: u32) -> (u32, u32) {
+        let range = (particle::INFLUENCE_FACTOR * RESOLUTION) as f32;
+        let floor = pixel_position.floor();
+        let mut min = floor - range;
+        let mut max = floor + range;
+        min = min.clamp(0.0, (scale - 1) as f32);
+        max = max.clamp(0.0, (scale - 1) as f32);
         return (min as u32, max as u32);
     }
 
-    fn check_grid(
+    fn check_pixel(
         &mut self,
         x: u32,
         y: u32,
-        grid: &GridBasic,
+        map: &PixelMapBasic,
         particles: &mut particle::Particles,
     ) {
-        let grid_start_index = Self::grid_coord_to_grid_start_index(x, y) as usize;
-        let total_particles_in_grid = grid[grid_start_index];
-        let start = grid_start_index + 1;
-        let end = start + total_particles_in_grid as usize;
-        for grid_index in start..end {
-            let particle_id = grid[grid_index] as usize;
-            let candidate = particles[particle_id];
-            let n = candidate.pre_fluid_position - self.particle.pre_fluid_position;
-            if n.length() < particle::PARTICLE_INFLUENCE {
-                let neighbour = particle::Particle::new(particle_id as u32, candidate);
-                self.store_neighbour(neighbour);
-            }
+        let coord = Self::linear_pixel_coord(x, y);
+        let mut neighbour_id = map[coord];
+
+        // Subtract 1 as all the IDs have been incremented to accomodate particle::NO_PARTICLE_ID
+        // TODO: can we use Option<T> instead of hacing ID 0?
+        if neighbour_id == NO_PARTICLE_ID {
+            return;
+        }
+        neighbour_id -= 1;
+
+        let particle = particles[neighbour_id as usize];
+        let neighbour = particle::Particle::new(neighbour_id, particle);
+        let length = neighbour.position.distance(self.particle.position);
+        if length < (particle::INFLUENCE_FACTOR as f32 * particle::PARTICLE_RADIUS) {
+            self.store_neighbour(neighbour);
         }
     }
 
@@ -173,112 +173,79 @@ impl NeighbouringParticles {
 mod tests {
     use super::*;
     use glam::vec2;
-    use particle::ParticleGridStartID;
     use world;
 
-    /// For a map (x) size of 3x3 and a grid (-|) resolution of 2.0, the map can be placed
-    /// in the grid as so:
-    /// ------------
-    /// |x x |   x |
-    /// |    |     |
-    /// ------------
-    /// |x x |   x |
-    /// |x x |   x |
-    /// ------------
+    const O: u32 = 1;
 
     fn make_particle(x: f32, y: f32) -> particle::ParticleBasic {
-        let mut particle = particle::ParticleBasic {
+        particle::ParticleBasic {
             position: vec2(x, y),
             ..Default::default()
-        };
-        particle.grid_start_index = particle.grid_start_index();
-        particle
+        }
     }
 
-    fn setup() -> (GridBasic, particle::Particles) {
-        let map: GridBasic = [0; TOTAL_GRID_STORAGE_SIZE];
+    fn setup() -> (PixelMapBasic, particle::Particles) {
+        let map: PixelMapBasic = Default::default();
         let mut particles: particle::Particles =
             [particle::ParticleBasic::default(); world::NUM_PARTICLES];
         particles[0] = make_particle(0.2, -0.2);
         particles[1] = make_particle(0.001, 0.001);
-
-        particles[2] = make_particle(0.8, 0.8);
+        particles[2] = make_particle(-0.2, 0.2);
         particles[3] = make_particle(1.0, 1.0);
-
-        particles[4] = make_particle(-0.001, -0.001);
         (map, particles)
     }
 
-    fn pixelize(grid: &mut GridBasic, particles: &mut particle::Particles) {
-        for grid_id in 0..GRID_COUNT {
-            NeighbouringParticles::populate_grid(grid_id as u32, particles, grid);
+    fn pixelize(map: &mut PixelMapBasic, particles: &mut particle::Particles) {
+        for i in 0..world::NUM_PARTICLES {
+            NeighbouringParticles::place_particle_in_pixel(
+                i as particle::ParticleID,
+                particles,
+                map,
+            );
         }
     }
 
     #[test]
-    fn it_calculates_basic_properties_of_grid() {
-        assert_eq!(GRIDS_PER_ROW, 2);
-        assert_eq!(GRIDS_PER_COL, 2);
-        assert_eq!(GRID_COUNT, 4);
-        assert_eq!(TOTAL_GRID_STORAGE_SIZE, 16);
-    }
-
-    #[test]
     fn it_converts_coords() {
-        let bp = make_particle(-1.0, -1.0);
-        assert_eq!(bp.grid_start_index(), 0);
-
         let bp = make_particle(0.0, 0.0);
-        assert_eq!(bp.grid_start_index(), 12);
-
-        let bp = make_particle(0.001, 0.001);
-        assert_eq!(bp.grid_start_index(), 12);
-
-        let bp = make_particle(1.0, -1.0);
-        assert_eq!(bp.grid_start_index(), 4);
-
-        let bp = make_particle(-1.0, 1.0);
-        assert_eq!(bp.grid_start_index(), 8);
-
-        let bp = make_particle(0.99, 0.99);
-        assert_eq!(bp.grid_start_index(), 12);
-
+        assert_eq!(bp.pixel_position(), vec2(1.0, 1.0));
+        let bp = make_particle(-1.0, -1.0);
+        assert_eq!(bp.pixel_position(), vec2(0.0, 0.0));
         let bp = make_particle(1.0, 1.0);
-        assert_eq!(bp.grid_start_index(), 12);
+        assert_eq!(bp.pixel_position(), vec2(2.0, 2.0));
     }
 
     #[test]
-    fn it_places_particles_in_grids() {
-        let (mut grid, mut particles) = setup();
-        pixelize(&mut grid, &mut particles);
+    fn it_places_particles_in_map() {
+        let (mut map, mut particles) = setup();
+        pixelize(&mut map, &mut particles);
         #[rustfmt::skip]
-        assert_eq!(grid, [
-        // count  particles   count  particles
-        // bottom row
-           1,     4, 0, 0,    1,     0, 0, 0,
-        // top row
-           0,     0, 0, 0,    3,     1, 2, 3,
+        assert_eq!(map, [
+            0,   0+O, 0,
+            2+O, 1+O, 0,
+            0,   0,   3+O
         ]);
     }
 
     #[test]
     fn it_finds_particles_around_the_centre() {
-        let (mut grid, mut particles) = setup();
-        pixelize(&mut grid, &mut particles);
-        let mut neighbours = NeighbouringParticles::find(1, &mut grid, &mut particles);
-        assert_eq!(neighbours.length(), 2);
-        assert_eq!(neighbours.get_neighbour(0).id, 4);
-        assert_eq!(neighbours.get_neighbour(1).id, 0);
-        assert_eq!(neighbours.get_neighbour(2).id, 0);
+        let (mut map, mut particles) = setup();
+        pixelize(&mut map, &mut particles);
+        let mut neighbours = NeighbouringParticles::find(1, &mut map, &mut particles);
+        assert_eq!(neighbours.length(), 3);
+        assert_eq!(neighbours.get_neighbour(0).id, 0);
+        assert_eq!(neighbours.get_neighbour(1).id, 2);
+        assert_eq!(neighbours.get_neighbour(2).id, 1);
+        assert_eq!(neighbours.get_neighbour(3).id, 0);
     }
 
     #[test]
     fn it_finds_particles_around_the_bottom_left() {
-        let (mut grid, mut particles) = setup();
-        pixelize(&mut grid, &mut particles);
-        let mut neighbours = NeighbouringParticles::find(3, &mut grid, &mut particles);
+        let (mut map, mut particles) = setup();
+        pixelize(&mut map, &mut particles);
+        let mut neighbours = NeighbouringParticles::find(3, &mut map, &mut particles);
         assert_eq!(neighbours.length(), 1);
-        assert_eq!(neighbours.get_neighbour(0).id, 2);
+        assert_eq!(neighbours.get_neighbour(0).id, 3);
         assert_eq!(neighbours.get_neighbour(1).id, 0);
     }
 }

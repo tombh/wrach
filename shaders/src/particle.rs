@@ -1,13 +1,9 @@
 #[cfg(not(target_arch = "spirv"))]
 use crevice::std140::AsStd140;
 
-#[cfg(target_arch = "spirv")]
-// For all the glam maths like trigonometry
-use spirv_std::num_traits::Float;
-
 use crate::neighbours;
 use crate::world;
-use crate::wrach_glam::glam::{Vec2, Vec4};
+use crate::wrach_glam::glam::{vec2, Vec2, Vec4};
 
 use core::f32::consts::PI;
 
@@ -30,7 +26,7 @@ const REST_DENSITY: f32 = 1.0 / (PARTICLE_DIAMETER * PARTICLE_DIAMETER);
 pub const PARTICLE_INFLUENCE: f32 = INFLUENCE_FACTOR as f32 * PARTICLE_RADIUS; // kernel radius
 const H2: f32 = PARTICLE_INFLUENCE * PARTICLE_INFLUENCE;
 const KERNEL_SCALE: f32 = 4.0 / (PI * H2 * H2 * H2 * H2); // 2d poly6 (SPH based shallow water simulation)
-const MAX_VEL: f32 = 0.4 * PARTICLE_RADIUS;
+const MAX_VEL: f32 = 0.5 * PARTICLE_RADIUS;
 
 const DT: f32 = TIME_STEP / DEFAULT_NUM_SOLVER_SUBSTEPS as f32;
 
@@ -47,7 +43,6 @@ pub struct ParticleBasic {
     pub pre_fluid_position: Vec2,
     pub velocity: Vec2,
     pub lambda: f32,
-    pub grid_start_index: u32,
 }
 
 impl ParticleBasic {
@@ -68,7 +63,6 @@ impl ParticleBasic {
         self.velocity = current_particle.particle.velocity;
         self.lambda = current_particle.particle.lambda;
         self.color = current_particle.particle.color;
-        self.grid_start_index = current_particle.particle.grid_start_index();
     }
 
     pub fn update(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
@@ -80,7 +74,6 @@ impl ParticleBasic {
         self.velocity = current_particle.particle.velocity;
         self.lambda = current_particle.particle.lambda;
         self.color = current_particle.particle.color;
-        self.grid_start_index = current_particle.particle.grid_start_index();
     }
 
     pub fn propogate(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
@@ -92,7 +85,6 @@ impl ParticleBasic {
         self.velocity = current_particle.particle.velocity;
         self.lambda = current_particle.particle.lambda;
         self.color = current_particle.particle.color;
-        self.grid_start_index = current_particle.particle.grid_start_index();
     }
 }
 
@@ -122,48 +114,30 @@ impl Particle {
     }
 }
 
-pub trait ParticleGridStartID {
-    fn grid_start_index(&self) -> neighbours::GridStartID {
-        0
+pub trait ParticleaAsPixel {
+    fn pixel_position(&self) -> Vec2 {
+        vec2(0.0, 0.0)
     }
     fn scale(&self, position: f32, scale: u32) -> f32 {
-        let scaled = ((position + 1.0) / 2.0) * scale as f32;
-        scaled.clamp(0.0, scale as f32 - 1e-5)
-    }
-    fn grid_coords_from_particle_coords(&self) -> (u32, u32) {
-        (0, 0)
+        ((position + 1.0) / 2.0) * (scale - 1) as f32
     }
 }
 
 // TODO: is there a way to de-duplicate these?
-impl ParticleGridStartID for Particle {
-    fn grid_coords_from_particle_coords(&self) -> (u32, u32) {
-        let x = self
-            .scale(self.position.x, neighbours::GRIDS_PER_ROW)
-            .floor() as u32;
-        let y = self
-            .scale(self.position.y, neighbours::GRIDS_PER_COL)
-            .floor() as u32;
-        (x, y)
-    }
-    fn grid_start_index(&self) -> neighbours::GridStartID {
-        let (x, y) = self.grid_coords_from_particle_coords();
-        neighbours::NeighbouringParticles::grid_coord_to_grid_start_index(x, y)
+impl ParticleaAsPixel for Particle {
+    fn pixel_position(&self) -> Vec2 {
+        vec2(
+            self.scale(self.position.x, neighbours::GRID_WIDTH),
+            self.scale(self.position.y, neighbours::GRID_HEIGHT),
+        )
     }
 }
-impl ParticleGridStartID for ParticleBasic {
-    fn grid_coords_from_particle_coords(&self) -> (u32, u32) {
-        let x = self
-            .scale(self.position.x, neighbours::GRIDS_PER_ROW)
-            .floor() as u32;
-        let y = self
-            .scale(self.position.y, neighbours::GRIDS_PER_COL)
-            .floor() as u32;
-        (x, y)
-    }
-    fn grid_start_index(&self) -> neighbours::GridStartID {
-        let (x, y) = self.grid_coords_from_particle_coords();
-        neighbours::NeighbouringParticles::grid_coord_to_grid_start_index(x, y)
+impl ParticleaAsPixel for ParticleBasic {
+    fn pixel_position(&self) -> Vec2 {
+        vec2(
+            self.scale(self.position.x, neighbours::GRID_WIDTH),
+            self.scale(self.position.y, neighbours::GRID_HEIGHT),
+        )
     }
 }
 
@@ -196,7 +170,6 @@ impl CurrentParticle {
     }
 
     pub fn compute(&mut self) {
-        // solve
         self.solve_fluid();
     }
 

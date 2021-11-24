@@ -1,5 +1,4 @@
 use crevice::std140::AsStd140;
-use shaders::particle::ParticleGridStartID;
 use shaders::wrach_glam::glam::{vec2, vec4};
 use wgpu::util::DeviceExt;
 
@@ -71,7 +70,7 @@ impl<'a> Builder<'a> {
                     ty: wgpu::BufferBindingType::Storage { read_only: false },
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<
-                        shaders::neighbours::GridBasic,
+                        shaders::neighbours::PixelMapBasic,
                     >() as u64),
                 },
                 count: None,
@@ -173,7 +172,7 @@ impl<'a> Builder<'a> {
         loop {
             loop {
                 let position = vec2(x, y); // * (1.0 + rng.gen_range(-jitter, jitter));
-                let mut particle = shaders::particle::ParticleBasic {
+                let particle = shaders::particle::ParticleBasic {
                     color: vec4(1.0, 1.0, 1.0, 1.0),
                     position,
                     previous: position,
@@ -184,7 +183,6 @@ impl<'a> Builder<'a> {
                     ),
                     ..Default::default()
                 };
-                particle.grid_start_index = particle.grid_start_index();
                 initial_particle_data.push(particle.as_std140());
                 count += 1;
                 if count > shaders::world::NUM_PARTICLES {

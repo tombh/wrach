@@ -115,22 +115,22 @@ impl EventLoop<'_> {
         }
     }
 
-    fn redraw_events_cleared(&mut self, control_flow: &mut winit::event_loop::ControlFlow) {
+    fn redraw_events_cleared(&mut self, _control_flow: &mut winit::event_loop::ControlFlow) {
         // Clamp to some max framerate to avoid busy-looping too much
         // (we might be in wgpu::PresentMode::Mailbox, thus discarding superfluous frames)
         //
         // winit has window.current_monitor().video_modes() but that is a list of all full screen video modes.
         // So without extra dependencies it's a bit tricky to get the max refresh rate we can run the window on.
         // Therefore we just go with 60fps - sorry 120hz+ folks!
-        let target_frametime = Duration::from_secs_f64(1.0 / 60.0);
+        let target_frametime = Duration::from_secs_f64(1.0 / 300.0);
         let time_since_last_frame = self.last_update_inst.elapsed();
         if time_since_last_frame >= target_frametime {
-            // window.request_redraw();
+            // self.manager.window.request_redraw();
             self.last_update_inst = Instant::now();
         } else {
-            *control_flow = winit::event_loop::ControlFlow::WaitUntil(
-                Instant::now() + target_frametime - time_since_last_frame,
-            );
+            // *control_flow = winit::event_loop::ControlFlow::WaitUntil(
+            //     Instant::now() + target_frametime - time_since_last_frame,
+            // );
         }
         self.manager.window.request_redraw();
         self.spawner.run_until_stalled();
@@ -224,10 +224,9 @@ impl EventLoop<'_> {
 
     fn compute_pass<'a>(&mut self, command_encoder: &'a mut wgpu::CommandEncoder) {
         command_encoder.clear_buffer(&self.manager.pipeline.grid_buffer, 0, None);
+        self.pre_compute_pass(command_encoder);
         command_encoder.push_debug_group("compute");
         {
-            self.pre_compute_pass(command_encoder);
-
             for _ in 0..shaders::particle::DEFAULT_NUM_SOLVER_SUBSTEPS {
                 self.compute_pass_stage(command_encoder, 0);
                 self.compute_pass_stage(command_encoder, 1);
@@ -240,14 +239,11 @@ impl EventLoop<'_> {
     fn pre_compute_pass<'a>(&mut self, command_encoder: &'a mut wgpu::CommandEncoder) {
         let mut cpass =
             command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
-
         let index = self.bind_group_index_toggled();
         let bind_groups = &self.manager.pipeline.particle_bind_groups[index];
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.pre_compute_pipeline);
-
-        let work_group_count = (shaders::neighbours::GRID_COUNT as f32 / 64.0) as u32 + 1;
-        cpass.dispatch(work_group_count, 1, 1);
+        cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
     }
 
     fn compute_pass_stage<'a>(

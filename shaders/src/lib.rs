@@ -19,31 +19,64 @@ pub mod wrach_glam;
 use wrach_glam::glam::{vec4, UVec3, Vec2, Vec4};
 
 #[rustfmt::skip]
-#[spirv(compute(threads(64)))]
+#[spirv(compute(threads(128)))]
 pub fn pre_main_cs(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(uniform, descriptor_set = 0, binding = 0)] _params: &compute::Params,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] _particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &mut neighbours::GridBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
 ) {
-    let grid_id = id.x;
-    if grid_id + 1 > neighbours::GRID_COUNT as u32 {
+    // Prevents the work item continuing until all work items in workgroup have reached it
+    // unsafe {
+    //     use spirv_std::memory::{Scope, Semantics};
+    //     spirv_std::arch::control_barrier::<
+    //         { Scope::Workgroup as u32 },
+    //         { Scope::Workgroup as u32 },
+    //         { Semantics::NONE.bits() },
+    //     >();
+    // }
+    let id = id.x as particle::ParticleID;
+    if id >= world::NUM_PARTICLES as u32 {
         return;
     }
-    neighbours::NeighbouringParticles::populate_grid(grid_id, particles_src, grid);
+    neighbours::NeighbouringParticles::place_particle_in_pixel(id, particles_src, map);
 }
 
 #[rustfmt::skip]
-#[spirv(compute(threads(64)))]
+#[spirv(compute(threads(128)))]
 pub fn main_cs(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(push_constant)] params: &compute::Params,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &neighbours::GridBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
 ) {
-    compute::entry(id, params, particles_src, particles_dst, grid, params.stage);
+    compute::entry(id, params, particles_src, particles_dst, map, params.stage);
+    let id = id.x as particle::ParticleID;
+    if id >= world::NUM_PARTICLES as u32 {
+        return;
+    }
+    particles_dst[id as usize].color = vec4(1.0, 1.0, 1.0, 0.0);
+    if id == 450 {
+        // let cp = particles_src[id as usize];
+        // for i in 0..world::NUM_PARTICLES {
+        //     let np = particles_src[i];
+        //     let distance = np.position.distance(cp.position);
+        //     if distance < particle::PARTICLE_INFLUENCE {
+        //         _particles_dst[i].color = vec4(1.0, 0.0, 0.0, 0.0);
+        //     }
+        // }
+        //
+        let mut neighbours =
+        neighbours::NeighbouringParticles::find(id as particle::ParticleID, map, particles_src);
+        for n in 0..neighbours.length() {
+            let np = neighbours.get_neighbour(n);
+            particles_dst[np.id as usize].color = vec4(1.0, 0.0, 0.0, 0.0);
+
+        }
+        particles_dst[id as usize].color = vec4(0.0, 1.0, 0.0, 0.0);
+    }
 }
 
 // Called for every index of a vertex, there are 6 in a square, because a square

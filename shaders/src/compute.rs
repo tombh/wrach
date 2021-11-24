@@ -25,7 +25,7 @@ pub fn entry(
     _params: &Params,
     particles_src: &mut particle::Particles,
     particles_dst: &mut particle::Particles,
-    grid: &neighbours::GridBasic,
+    grid: &neighbours::PixelMapBasic,
     stage: u32,
 ) {
     let id = id.x as usize;

@@ -6,7 +6,7 @@ use super::builder;
 const NUM_PARTICLES: u32 = shaders::world::NUM_PARTICLES as u32;
 
 // number of single-particle calculations (invocations) in each gpu work group
-const PARTICLES_PER_GROUP: u32 = 64;
+const PARTICLES_PER_GROUP: u32 = 128;
 
 pub struct Pipeline {
     pub particle_bind_groups: Vec<wgpu::BindGroup>,
@@ -75,8 +75,7 @@ impl Pipeline {
             );
         }
 
-        let grid: shaders::neighbours::GridBasic =
-            [0; shaders::neighbours::TOTAL_GRID_STORAGE_SIZE];
+        let grid: shaders::neighbours::PixelMapBasic = [0; shaders::neighbours::GRID_SIZE];
         let grid_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Pixel Map")),
             contents: bytemuck::cast_slice(&grid),
