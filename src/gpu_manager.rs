@@ -1,4 +1,4 @@
-use crate::pipeline::Pipeline;
+use crate::pipeline::pipeline;
 use winit;
 
 pub struct GPUManager {
@@ -7,10 +7,10 @@ pub struct GPUManager {
     pub size: winit::dpi::PhysicalSize<u32>,
     pub surface: wgpu::Surface,
     pub adapter: wgpu::Adapter,
-    pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub pipeline: Pipeline,
+    pub device: wgpu::Device,
     pub config: wgpu::SurfaceConfiguration,
+    pub pipeline: pipeline::Pipeline,
 }
 
 impl GPUManager {
@@ -47,8 +47,8 @@ impl GPUManager {
             println!("Using {} ({:?})", adapter_info.name, adapter_info.backend);
         }
 
-        let optional_features = Pipeline::optional_features();
-        let required_features = Pipeline::required_features();
+        let optional_features = pipeline::Pipeline::optional_features();
+        let required_features = pipeline::Pipeline::required_features();
         let adapter_features = adapter.features();
         assert!(
             adapter_features.contains(required_features),
@@ -56,7 +56,7 @@ impl GPUManager {
             required_features - adapter_features
         );
 
-        let required_downlevel_capabilities = Pipeline::required_downlevel_capabilities();
+        let required_downlevel_capabilities = pipeline::Pipeline::required_downlevel_capabilities();
         let downlevel_capabilities = adapter.get_downlevel_properties();
         assert!(
             downlevel_capabilities.shader_model >= required_downlevel_capabilities.shader_model,
@@ -72,7 +72,8 @@ impl GPUManager {
             );
 
         // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the surface.
-        let needed_limits = Pipeline::required_limits().using_resolution(adapter.limits());
+        let needed_limits =
+            pipeline::Pipeline::required_limits().using_resolution(adapter.limits());
 
         let trace_dir = std::env::var("WGPU_TRACE");
         let (device, queue) = adapter
@@ -96,27 +97,24 @@ impl GPUManager {
         };
 
         surface.configure(&device, &config);
+        let pipeline = pipeline::Pipeline::init(&config, &device);
 
-        let pipeline = Pipeline::init(&config, &device);
+        let manager = Self {
+            window,
+            instance,
+            size,
+            surface,
+            adapter,
+            device,
+            queue,
+            config,
+            pipeline,
+        };
 
         (
-            Self {
-                window,
-                instance,
-                size,
-                surface,
-                adapter,
-                device,
-                queue,
-                pipeline,
-                config,
-            },
+            manager,
             // `event_loop` has to be passed seperately because of the `event_loop.run()` closure
             event_loop,
         )
-    }
-
-    pub fn start(self: Self, event_loop: winit::event_loop::EventLoop<()>) {
-        crate::event_loop::run(self, event_loop);
     }
 }

@@ -22,7 +22,7 @@ use wrach_glam::glam::{vec4, UVec3, Vec2, Vec4};
 #[spirv(compute(threads(64)))]
 pub fn pre_main_cs(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] _params: &compute::SimParams,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] _params: &compute::Params,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] _particles_dst: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &mut neighbours::GridBasic,
@@ -36,38 +36,14 @@ pub fn pre_main_cs(
 
 #[rustfmt::skip]
 #[spirv(compute(threads(64)))]
-pub fn predict_main_cs(
-    #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] params: &compute::SimParams,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &neighbours::GridBasic,
-) {
-    compute::entry(id, params, particles_src, particles_dst, grid, 0);
-}
-
-#[rustfmt::skip]
-#[spirv(compute(threads(64)))]
 pub fn main_cs(
     #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] params: &compute::SimParams,
+    #[spirv(push_constant)] params: &compute::Params,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &neighbours::GridBasic,
 ) {
-    compute::entry(id, params, particles_src, particles_dst, grid, 1);
-}
-
-#[rustfmt::skip]
-#[spirv(compute(threads(64)))]
-pub fn post_main_cs(
-    #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] params: &compute::SimParams,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] grid: &neighbours::GridBasic,
-) {
-    compute::entry(id, params, particles_src, particles_dst, grid, 2);
+    compute::entry(id, params, particles_src, particles_dst, grid, params.stage);
 }
 
 // Called for every index of a vertex, there are 6 in a square, because a square
@@ -76,6 +52,7 @@ pub fn post_main_cs(
 pub fn main_vs(
     #[spirv(vertex_index)] _vert_id: i32,
     #[spirv(position)] screen_position: &mut Vec4,
+    #[spirv(push_constant)] _params: &compute::Params,
     particle_color: Vec4,
     particle_position: Vec2,
     _particle_velocity: Vec2,
@@ -98,7 +75,8 @@ pub fn main_vs(
 }
 
 // Basically just the colour
+
 #[spirv(fragment)]
-pub fn main_fs(input: Vec4, output: &mut Vec4) {
+pub fn main_fs(#[spirv(push_constant)] _params: &compute::Params, input: Vec4, output: &mut Vec4) {
     *output = vec4(input.x, input.y, input.z, input.w);
 }

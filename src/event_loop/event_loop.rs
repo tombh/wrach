@@ -1,24 +1,29 @@
+use crevice::std140::AsStd140;
 use std::time::{Duration, Instant};
 use winit::event::{self, WindowEvent};
 use winit::event_loop::ControlFlow;
+use winit::platform::run_return::EventLoopExtRunReturn;
 
 use super::spawner;
 use crate::gpu_manager;
 
-pub struct EventLoop {
+pub struct EventLoop<'a> {
     manager: gpu_manager::GPUManager,
+    is_paused: bool,
     is_exit: bool,
-    spawner: spawner::Spawner<'static>,
+    spawner: spawner::Spawner<'a>,
     last_frame_inst: Instant,
     last_update_inst: Instant,
     frame_count: u64,
     accum_time: f32,
 }
 
-impl EventLoop {
-    pub fn run(manager: gpu_manager::GPUManager, event_loop: winit::event_loop::EventLoop<()>) {
+impl EventLoop<'_> {
+    pub fn run() {
+        let (manager, event_loop) = pollster::block_on(gpu_manager::GPUManager::setup());
         let instance = Self {
             manager,
+            is_paused: false,
             is_exit: false,
             spawner: spawner::Spawner::new(),
             last_update_inst: Instant::now(),
@@ -26,12 +31,13 @@ impl EventLoop {
             frame_count: 0,
             accum_time: 0.0,
         };
+
         instance.enter(event_loop);
     }
 
-    pub fn enter(mut self, event_loop: winit::event_loop::EventLoop<()>) {
+    pub fn enter(mut self, mut event_loop: winit::event_loop::EventLoop<()>) {
         log::info!("Entering render loop...");
-        event_loop.run(move |event, _, control_flow| {
+        event_loop.run_return(move |event, _, control_flow| {
             // Only captured so they're droppped
             let _ = (&self.manager.instance, &self.manager.adapter);
 
@@ -92,7 +98,7 @@ impl EventLoop {
                         // println!("{:#?}", instance.generate_report());
                     }
                     (event::VirtualKeyCode::Space, event::ElementState::Pressed) => {
-                        self.manager.pipeline.toggle_pause();
+                        self.toggle_pause();
                     }
                     (event::VirtualKeyCode::Escape, event::ElementState::Pressed) => {
                         self.is_exit = true;
@@ -133,8 +139,7 @@ impl EventLoop {
     fn redraw_requestsed(&mut self) {
         self.accum_time += self.last_frame_inst.elapsed().as_secs_f32();
         self.last_frame_inst = Instant::now();
-        self.frame_count += 1;
-        if self.frame_count == 100 {
+        if self.frame_count > 100 {
             println!(
                 "Avg frame time {}ms",
                 self.accum_time * 1000.0 / self.frame_count as f32
@@ -159,9 +164,125 @@ impl EventLoop {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.manager
-            .pipeline
-            .render(&view, &self.manager.device, &self.manager.queue);
+        self.render(&view);
         frame.present();
+    }
+
+    fn init_command_encoder(manager: &gpu_manager::GPUManager) -> wgpu::CommandEncoder {
+        manager
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None })
+    }
+
+    fn init_render_pass<'a>(
+        command_encoder: &'a mut wgpu::CommandEncoder,
+        view: &'a wgpu::TextureView,
+    ) -> wgpu::RenderPass<'a> {
+        // create render pass descriptor and its color attachments
+        let color_attachments = [wgpu::RenderPassColorAttachment {
+            view,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                store: true,
+            },
+        }];
+        let render_pass_descriptor = wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &color_attachments,
+            depth_stencil_attachment: None,
+        };
+
+        command_encoder.begin_render_pass(&render_pass_descriptor)
+    }
+
+    fn bind_group_index_toggled(&mut self) -> usize {
+        if self.manager.pipeline.bind_group == 0 {
+            self.manager.pipeline.bind_group = 1;
+        } else {
+            self.manager.pipeline.bind_group = 0;
+        }
+        self.manager.pipeline.bind_group
+    }
+
+    pub fn toggle_pause(&mut self) {
+        self.is_paused = !self.is_paused;
+    }
+
+    /// Called for every frame
+    pub fn render(&mut self, view: &wgpu::TextureView) {
+        if self.is_paused {
+            return;
+        }
+
+        let mut command_encoder = Self::init_command_encoder(&self.manager);
+        self.compute_pass(&mut command_encoder);
+        self.render_pass(&mut command_encoder, view);
+        self.manager.queue.submit(Some(command_encoder.finish()));
+        self.frame_count += 1;
+    }
+
+    fn compute_pass<'a>(&mut self, command_encoder: &'a mut wgpu::CommandEncoder) {
+        command_encoder.clear_buffer(&self.manager.pipeline.grid_buffer, 0, None);
+        command_encoder.push_debug_group("compute");
+        {
+            self.pre_compute_pass(command_encoder);
+
+            for _ in 0..shaders::particle::DEFAULT_NUM_SOLVER_SUBSTEPS {
+                self.compute_pass_stage(command_encoder, 0);
+                self.compute_pass_stage(command_encoder, 1);
+                self.compute_pass_stage(command_encoder, 2);
+            }
+        }
+        command_encoder.pop_debug_group();
+    }
+
+    fn pre_compute_pass<'a>(&mut self, command_encoder: &'a mut wgpu::CommandEncoder) {
+        let mut cpass =
+            command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
+
+        let index = self.bind_group_index_toggled();
+        let bind_groups = &self.manager.pipeline.particle_bind_groups[index];
+        cpass.set_bind_group(0, bind_groups, &[]);
+        cpass.set_pipeline(&self.manager.pipeline.pre_compute_pipeline);
+
+        let work_group_count = (shaders::neighbours::GRID_COUNT as f32 / 64.0) as u32 + 1;
+        cpass.dispatch(work_group_count, 1, 1);
+    }
+
+    fn compute_pass_stage<'a>(
+        &mut self,
+        command_encoder: &'a mut wgpu::CommandEncoder,
+        stage: u32,
+    ) {
+        let mut cpass =
+            command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
+        let index = self.bind_group_index_toggled();
+        let bind_groups = &self.manager.pipeline.particle_bind_groups[index];
+        cpass.set_bind_group(0, bind_groups, &[]);
+        cpass.set_pipeline(&self.manager.pipeline.compute_pipeline);
+
+        let ps = shaders::compute::Params { stage };
+        cpass.set_push_constants(0, bytemuck::bytes_of(&ps.as_std140()));
+        cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
+    }
+
+    fn render_pass<'a>(
+        &mut self,
+        command_encoder: &'a mut wgpu::CommandEncoder,
+        view: &'a wgpu::TextureView,
+    ) {
+        let index = self.bind_group_index_toggled();
+        let particle_buffer = self.manager.pipeline.particle_buffers[index].slice(..);
+        command_encoder.push_debug_group("render pixels");
+        {
+            let mut rpass = Self::init_render_pass(command_encoder, view);
+            rpass.set_pipeline(&self.manager.pipeline.render_pipeline);
+            rpass.set_vertex_buffer(0, particle_buffer);
+            // Verticles that draw the littel square  "pixel"
+            rpass.set_vertex_buffer(1, self.manager.pipeline.vertices_buffer.slice(..));
+            rpass.draw(0..6, 0..shaders::world::NUM_PARTICLES as u32);
+        }
+        command_encoder.pop_debug_group();
     }
 }

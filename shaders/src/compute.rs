@@ -1,19 +1,20 @@
+#[cfg(not(target_arch = "spirv"))]
+use crevice::std140::AsStd140;
+
 use crate::wrach_glam::glam::UVec3;
 
 use crate::neighbours;
 use crate::particle;
 use crate::world;
 
-pub struct SimParams {
+#[cfg_attr(not(target_arch = "spirv"), derive(AsStd140, Debug))]
+#[derive(Default, Copy, Clone)]
+#[repr(C)]
+pub struct Params {
     pub stage: u32,
-    _rule1_distance: f32,
-    _rule2_distance: f32,
-    _rule3_distance: f32,
-    _rule1_scale: f32,
-    _rule2_scale: f32,
-    _rule3_scale: f32,
 }
 
+// Crevice doesn't support enums, so maybe define this with bytemuck?
 // pub enum Stage {
 //     Solve,
 //     Propogate,
@@ -21,7 +22,7 @@ pub struct SimParams {
 
 pub fn entry(
     id: UVec3,
-    _params: &SimParams,
+    _params: &Params,
     particles_src: &mut particle::Particles,
     particles_dst: &mut particle::Particles,
     grid: &neighbours::GridBasic,
