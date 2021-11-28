@@ -1,4 +1,5 @@
 use bytemuck;
+use crevice::std140::AsStd140;
 use wgpu::util::DeviceExt;
 
 use super::builder;
@@ -29,7 +30,6 @@ impl Pipeline {
         let shader_module = device.create_shader_module(&shader_binary);
 
         let params_buffer = builder.params_buffer(shaders::compute::Params { stage: 0 });
-
         let compute_bind_group_layout = builder.compute_bind_group_layout();
         let compute_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -75,10 +75,18 @@ impl Pipeline {
             );
         }
 
-        let grid: shaders::neighbours::PixelMapBasic = [0; shaders::neighbours::GRID_SIZE];
+        let null_id = shaders::particle::ParticleIDGlobal {
+            id: shaders::particle::ParticleIDGlobal::null(),
+        };
+        let mut grid: Vec<shaders::particle::Std140ParticleIDGlobal> = Vec::new();
+        for _ in 0..shaders::neighbours::PIXEL_GRID_GLOBAL_SIZE {
+            grid.push(null_id.as_std140());
+        }
+        let contents = bytemuck::cast_slice(&grid);
+        log::warn!("{}", std::mem::size_of_val(contents));
         let grid_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Pixel Map")),
-            contents: bytemuck::cast_slice(&grid),
+            contents,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 

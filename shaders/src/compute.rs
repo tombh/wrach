@@ -1,11 +1,12 @@
+use spirv_std::memory::{Scope, Semantics};
+
 #[cfg(not(target_arch = "spirv"))]
 use crevice::std140::AsStd140;
 
-use crate::wrach_glam::glam::UVec3;
-
+use crate::compute;
 use crate::neighbours;
 use crate::particle;
-use crate::world;
+use crate::workgroup;
 
 #[cfg_attr(not(target_arch = "spirv"), derive(AsStd140, Debug))]
 #[derive(Default, Copy, Clone)]
@@ -14,32 +15,67 @@ pub struct Params {
     pub stage: u32,
 }
 
-// Crevice doesn't support enums, so maybe define this with bytemuck?
-// pub enum Stage {
-//     Solve,
-//     Propogate,
-// }
+pub struct GPUIdentifiers {
+    pub global: u32,
+    pub workgroup: u32,
+    pub local: u32,
+}
+
+impl GPUIdentifiers {
+    pub fn global_id_to_particle_id(&self) -> particle::ParticleIDGlobal {
+        particle::ParticleIDGlobal { id: self.global }
+    }
+}
+
+/// Prevents the work item continuing until all work items in workgroup have reached it
+pub fn execution_barrier() {
+    unsafe {
+        spirv_std::arch::control_barrier::<
+            { Scope::Workgroup as u32 },
+            { Scope::Workgroup as u32 },
+            { Semantics::NONE.bits() },
+        >();
+    }
+}
+
+pub fn memory_barrier() {
+    unsafe {
+        spirv_std::arch::memory_barrier::<{ Scope::Workgroup as u32 }, { Scope::Workgroup as u32 }>(
+        );
+    }
+}
 
 pub fn entry(
-    id: UVec3,
+    ids: GPUIdentifiers,
     _params: &Params,
-    particles_src: &mut particle::Particles,
-    particles_dst: &mut particle::Particles,
-    grid: &neighbours::PixelMapBasic,
-    stage: u32,
+    particles_src: &mut particle::ParticlesGlobal,
+    _particles_dst: &mut particle::ParticlesGlobal,
+    workgroup_data: &mut workgroup::WorkGroupData,
+    pixel_grid: &mut neighbours::PixelGridGlobal,
 ) {
-    let id = id.x as usize;
-    if id >= world::NUM_PARTICLES {
-        return;
+    workgroup_data.workgroup_id = ids.workgroup;
+    workgroup_data.populate(ids.local, pixel_grid, particles_src);
+    compute::execution_barrier();
+
+    let mut stage = 0;
+    while stage < 3 {
+        let mut job = 0;
+        loop {
+            let particle = workgroup_data.particle_for_work_item(ids.local, job);
+            if particle.id_global.id == particle::ParticleIDLocal::null() {
+                break;
+            }
+            //neighbours::NeighbouringParticles::find(particle_local, workgroup_data);
+            // let mut current_particle = particle::CurrentParticle::new(ids.local as usize, particle);
+            // match stage {
+            //     0 => current_particle.predict(),
+            //     // 1 => current_particle.compute(workgroup_data),
+            //     // 2 => current_particle.propogate(workgroup_data),
+            //     _ => (),
+            // }
+            job += 1;
+        }
+        //compute::execution_barrier();
+        stage += 1;
     }
-    let neighbours =
-        neighbours::NeighbouringParticles::find(id as particle::ParticleID, grid, particles_src);
-    match stage {
-        0 => particles_src[id].predict(id as particle::ParticleID, neighbours),
-        1 => particles_src[id].update(id as particle::ParticleID, neighbours),
-        2 => particles_src[id].propogate(id as particle::ParticleID, neighbours),
-        _ => (),
-    }
-    // TODO don't write to particles_src
-    particles_dst[id] = particles_src[id];
 }

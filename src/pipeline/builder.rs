@@ -24,10 +24,9 @@ impl<'a> Builder<'a> {
     }
 
     pub fn compute_bind_group_layout(&mut self) -> wgpu::BindGroupLayout {
-        let sizeof_particle = std::mem::size_of::<shaders::particle::Std140ParticleBasic>();
+        let sizeof_particle = std::mem::size_of::<shaders::particle::Std140ParticleGlobal>();
         let sizeof_particles = (sizeof_particle * shaders::world::NUM_PARTICLES as usize) as u64;
         let sizeof_params = std::mem::size_of::<shaders::compute::Params>() as u64;
-
         let bind_groups = [
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
@@ -70,7 +69,7 @@ impl<'a> Builder<'a> {
                     ty: wgpu::BufferBindingType::Storage { read_only: false },
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<
-                        shaders::neighbours::PixelMapBasic,
+                        shaders::neighbours::PixelGridGlobal,
                     >() as u64),
                 },
                 count: None,
@@ -95,7 +94,7 @@ impl<'a> Builder<'a> {
                 });
 
         let particle_array_stride =
-            std::mem::size_of::<shaders::particle::Std140ParticleBasic>() as u64;
+            std::mem::size_of::<shaders::particle::Std140ParticleGlobal>() as u64;
 
         let fragment = wgpu::FragmentState {
             module: shader_module,
@@ -157,12 +156,12 @@ impl<'a> Builder<'a> {
             })
     }
 
-    pub fn init_particle_buffer(&mut self) -> Vec<shaders::particle::Std140ParticleBasic> {
-        let mut initial_particle_data: Vec<shaders::particle::Std140ParticleBasic> = Vec::new();
+    pub fn init_particle_buffer(&mut self) -> Vec<shaders::particle::Std140ParticleGlobal> {
+        let mut initial_particle_data: Vec<shaders::particle::Std140ParticleGlobal> = Vec::new();
         let mut count = 0;
-        let x_min = -0.0;
+        let x_min = -0.8;
         let mut x = x_min;
-        let mut y = -0.4;
+        let mut y = -0.8;
         let spacing = 2.0 * shaders::particle::PARTICLE_RADIUS;
 
         use rand::Rng;
@@ -172,11 +171,9 @@ impl<'a> Builder<'a> {
         loop {
             loop {
                 let position = vec2(x, y); // * (1.0 + rng.gen_range(-jitter, jitter));
-                let particle = shaders::particle::ParticleBasic {
+                let particle = shaders::particle::ParticleGlobal {
                     color: vec4(1.0, 1.0, 1.0, 1.0),
                     position,
-                    previous: position,
-                    pre_fluid_position: position,
                     velocity: vec2(
                         rng.gen_range(-jitter, jitter),
                         rng.gen_range(-jitter, jitter),

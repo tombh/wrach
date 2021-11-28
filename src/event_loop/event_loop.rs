@@ -1,4 +1,3 @@
-use crevice::std140::AsStd140;
 use std::time::{Duration, Instant};
 use winit::event::{self, WindowEvent};
 use winit::event_loop::ControlFlow;
@@ -228,9 +227,7 @@ impl EventLoop<'_> {
         command_encoder.push_debug_group("compute");
         {
             for _ in 0..shaders::particle::DEFAULT_NUM_SOLVER_SUBSTEPS {
-                self.compute_pass_stage(command_encoder, 0);
-                self.compute_pass_stage(command_encoder, 1);
-                self.compute_pass_stage(command_encoder, 2);
+                self.compute_pass_stage(command_encoder);
             }
         }
         command_encoder.pop_debug_group();
@@ -246,11 +243,7 @@ impl EventLoop<'_> {
         cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
     }
 
-    fn compute_pass_stage<'a>(
-        &mut self,
-        command_encoder: &'a mut wgpu::CommandEncoder,
-        stage: u32,
-    ) {
+    fn compute_pass_stage<'a>(&mut self, command_encoder: &'a mut wgpu::CommandEncoder) {
         let mut cpass =
             command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
         let index = self.bind_group_index_toggled();
@@ -258,9 +251,13 @@ impl EventLoop<'_> {
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.compute_pipeline);
 
-        let ps = shaders::compute::Params { stage };
-        cpass.set_push_constants(0, bytemuck::bytes_of(&ps.as_std140()));
-        cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
+        //let ps = shaders::compute::Params { stage };
+        //cpass.set_push_constants(0, bytemuck::bytes_of(&ps.as_std140()));
+        let work_group_count = ((shaders::neighbours::PIXEL_GRID_GLOBAL_SIZE as f32)
+            / (shaders::neighbours::PIXEL_GRID_LOCAL_SIZE as f32))
+            .ceil() as u32;
+        //let work_group_count = 30;
+        cpass.dispatch(work_group_count, 1, 1);
     }
 
     fn render_pass<'a>(

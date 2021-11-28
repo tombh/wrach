@@ -2,6 +2,7 @@
 use crevice::std140::AsStd140;
 
 use crate::neighbours;
+use crate::workgroup;
 use crate::world;
 use crate::wrach_glam::glam::{vec2, Vec2, Vec4};
 
@@ -24,92 +25,77 @@ const UNILATERAL: bool = true;
 const PARTICLE_DIAMETER: f32 = 2.0 * PARTICLE_RADIUS;
 const REST_DENSITY: f32 = 1.0 / (PARTICLE_DIAMETER * PARTICLE_DIAMETER);
 pub const PARTICLE_INFLUENCE: f32 = INFLUENCE_FACTOR as f32 * PARTICLE_RADIUS; // kernel radius
+
 const H2: f32 = PARTICLE_INFLUENCE * PARTICLE_INFLUENCE;
 const KERNEL_SCALE: f32 = 4.0 / (PI * H2 * H2 * H2 * H2); // 2d poly6 (SPH based shallow water simulation)
 const MAX_VEL: f32 = 0.5 * PARTICLE_RADIUS;
 
 const DT: f32 = TIME_STEP / DEFAULT_NUM_SOLVER_SUBSTEPS as f32;
 
-pub type ParticleID = u32;
+#[cfg_attr(not(target_arch = "spirv"), derive(AsStd140, Debug))]
+#[derive(Default, Copy, Clone)]
+pub struct ParticleIDGlobal {
+    pub id: u32,
+}
+
+impl ParticleIDGlobal {
+    pub fn null() -> u32 {
+        u32::MAX
+    }
+}
+
+#[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
+#[derive(Default, Copy, Clone)]
+pub struct ParticleIDLocal {
+    pub id: u32,
+}
+
+impl ParticleIDLocal {
+    pub fn null() -> u32 {
+        u32::MAX
+    }
+}
 
 // Field order matters!! Because of std140, wgpu, spirv, etc
 #[cfg_attr(not(target_arch = "spirv"), derive(AsStd140, Debug))]
 #[derive(Default, Copy, Clone)]
 #[repr(C)]
-pub struct ParticleBasic {
+pub struct ParticleGlobal {
     pub color: Vec4,
     pub position: Vec2,
-    pub previous: Vec2,
-    pub pre_fluid_position: Vec2,
     pub velocity: Vec2,
-    pub lambda: f32,
-}
-
-impl ParticleBasic {
-    fn to_current_particle(
-        &self,
-        id: ParticleID,
-        neighbours: neighbours::NeighbouringParticles,
-    ) -> CurrentParticle {
-        CurrentParticle::new(id, *self, neighbours)
-    }
-
-    pub fn predict(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
-        let mut current_particle = self.to_current_particle(id, neighbours);
-        current_particle.predict();
-        self.position = current_particle.particle.position;
-        self.previous = current_particle.particle.previous;
-        self.pre_fluid_position = current_particle.particle.pre_fluid_position;
-        self.velocity = current_particle.particle.velocity;
-        self.lambda = current_particle.particle.lambda;
-        self.color = current_particle.particle.color;
-    }
-
-    pub fn update(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
-        let mut current_particle = self.to_current_particle(id, neighbours);
-        current_particle.compute();
-        self.position = current_particle.particle.position;
-        self.previous = current_particle.particle.previous;
-        self.pre_fluid_position = current_particle.particle.pre_fluid_position;
-        self.velocity = current_particle.particle.velocity;
-        self.lambda = current_particle.particle.lambda;
-        self.color = current_particle.particle.color;
-    }
-
-    pub fn propogate(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
-        let mut current_particle = self.to_current_particle(id, neighbours);
-        current_particle.propogate();
-        self.position = current_particle.particle.position;
-        self.previous = current_particle.particle.previous;
-        self.pre_fluid_position = current_particle.particle.pre_fluid_position;
-        self.velocity = current_particle.particle.velocity;
-        self.lambda = current_particle.particle.lambda;
-        self.color = current_particle.particle.color;
-    }
 }
 
 #[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
-#[derive(Default, Clone, Copy)]
-pub struct Particle {
-    pub id: ParticleID,
+#[derive(Default, Copy, Clone)]
+pub struct ParticleLocal {
+    pub id_global: ParticleIDGlobal,
+    pub color: Vec4,
     pub position: Vec2,
     pub previous: Vec2,
     pub pre_fluid_position: Vec2,
     pub velocity: Vec2,
     pub lambda: f32,
-    pub color: Vec4,
 }
 
-impl Particle {
-    pub fn new(id: ParticleID, particle_basic: ParticleBasic) -> Particle {
-        Particle {
-            id,
-            position: particle_basic.position,
-            previous: particle_basic.previous,
-            pre_fluid_position: particle_basic.pre_fluid_position,
-            velocity: particle_basic.velocity,
-            lambda: particle_basic.lambda,
-            color: particle_basic.color,
+impl ParticleLocal {
+    pub fn new(id: ParticleIDGlobal, particle_global: ParticleGlobal) -> ParticleLocal {
+        ParticleLocal {
+            id_global: id,
+            position: particle_global.position,
+            velocity: particle_global.velocity,
+            color: particle_global.color,
+            lambda: 0.0,
+            pre_fluid_position: vec2(0.0, 0.0),
+            previous: vec2(0.0, 0.0),
+        }
+    }
+
+    pub fn to_global(&self) -> ParticleGlobal {
+        ParticleGlobal {
+            position: self.position,
+            velocity: self.velocity,
+            color: self.color,
         }
     }
 }
@@ -124,40 +110,36 @@ pub trait ParticleaAsPixel {
 }
 
 // TODO: is there a way to de-duplicate these?
-impl ParticleaAsPixel for Particle {
+impl ParticleaAsPixel for ParticleLocal {
     fn pixel_position(&self) -> Vec2 {
         vec2(
-            self.scale(self.position.x, neighbours::GRID_WIDTH),
-            self.scale(self.position.y, neighbours::GRID_HEIGHT),
+            self.scale(self.position.x, neighbours::PIXEL_GRID_GLOBAL_COLS),
+            self.scale(self.position.y, neighbours::PIXEL_GRID_GLOBAL_ROWS),
         )
     }
 }
-impl ParticleaAsPixel for ParticleBasic {
+impl ParticleaAsPixel for ParticleGlobal {
     fn pixel_position(&self) -> Vec2 {
         vec2(
-            self.scale(self.position.x, neighbours::GRID_WIDTH),
-            self.scale(self.position.y, neighbours::GRID_HEIGHT),
+            self.scale(self.position.x, neighbours::PIXEL_GRID_GLOBAL_COLS),
+            self.scale(self.position.y, neighbours::PIXEL_GRID_GLOBAL_ROWS),
         )
     }
 }
 
-pub type Particles = [ParticleBasic; world::NUM_PARTICLES];
+pub type ParticlesGlobal = [ParticleGlobal; world::NUM_PARTICLES];
 
 #[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
 pub struct CurrentParticle {
-    pub particle: Particle,
-    neighbours: neighbours::NeighbouringParticles,
+    pub particle: ParticleLocal,
+    thread_id: usize,
 }
 
 impl CurrentParticle {
-    pub fn new(
-        id: ParticleID,
-        particle_basic: ParticleBasic,
-        neighbours: neighbours::NeighbouringParticles,
-    ) -> CurrentParticle {
+    pub fn new(thread_id: usize, particle_local: ParticleLocal) -> CurrentParticle {
         CurrentParticle {
-            particle: Particle::new(id, particle_basic),
-            neighbours,
+            thread_id,
+            particle: particle_local,
         }
     }
 
@@ -169,24 +151,38 @@ impl CurrentParticle {
         self.particle.pre_fluid_position = self.particle.position;
     }
 
-    pub fn compute(&mut self) {
-        self.solve_fluid();
+    pub fn compute(&mut self, workgroup_data: &mut workgroup::WorkGroupData) {
+        self.solve_fluid(workgroup_data);
+    }
+
+    fn get_neighbour(
+        &mut self,
+        workgroup_data: &workgroup::WorkGroupData,
+        i: usize,
+    ) -> ParticleIDLocal {
+        let id = &workgroup_data.neighbours[self.thread_id][i + 1];
+        ParticleIDLocal { id: id.id }
+    }
+
+    fn neighbours_count(&self, workgroup_data: &mut workgroup::WorkGroupData) -> usize {
+        workgroup_data.neighbours[self.thread_id][0].id as usize
     }
 
     fn solve_boundaries(&mut self) {
         let wall = 0.95;
         let p = &mut self.particle.position;
-
+        //
         p.y = p.y.clamp(-wall, wall);
         p.x = p.x.clamp(-wall, wall);
     }
 
-    fn solve_fluid(&mut self) {
+    fn solve_fluid(&mut self, workgroup_data: &mut workgroup::WorkGroupData) {
         let mut rho = 0.0;
         let mut sum_grad2 = 0.0;
         let mut grad_i = Vec2::ZERO;
-        for i in 0..self.neighbours.length() {
-            let neighbour = self.neighbours.get_neighbour(i);
+        for i in 0..self.neighbours_count(workgroup_data) {
+            let neighbour_id = self.get_neighbour(workgroup_data, i);
+            let neighbour = &workgroup_data.particles[neighbour_id.id as usize];
             // TODO reuse the length from grid search?
             let mut n = neighbour.position - self.particle.position;
             let r = n.length();
@@ -214,11 +210,12 @@ impl CurrentParticle {
         self.particle.lambda = lambda;
     }
 
-    fn propogate(&mut self) {
+    pub fn propogate(&mut self, workgroup_data: &mut workgroup::WorkGroupData) {
         let mut tmp_position = self.particle.pre_fluid_position;
-        for i in 0..self.neighbours.length() {
-            let neighbour = self.neighbours.get_neighbour(i);
-            if neighbour.id == self.particle.id {
+        for i in 0..self.neighbours_count(workgroup_data) {
+            let neighbour_id = self.get_neighbour(workgroup_data, i);
+            let neighbour = &workgroup_data.particles[neighbour_id.id as usize];
+            if neighbour.id_global.id == self.particle.id_global.id {
                 continue;
             }
             // TODO reuse the length from grid search?
@@ -246,19 +243,20 @@ impl CurrentParticle {
             self.particle.position = self.particle.previous + v;
         }
         self.particle.velocity = v / DT;
-        self.apply_viscosity();
+        self.apply_viscosity(workgroup_data);
     }
 
-    fn apply_viscosity(&mut self) {
+    fn apply_viscosity(&mut self, workgroup_data: &mut workgroup::WorkGroupData) {
         let mut avg_vel = Vec2::ZERO;
-        for i in 0..self.neighbours.length() {
-            let neighbour = self.neighbours.get_neighbour(i);
-            if neighbour.id == self.particle.id {
+        for i in 0..self.neighbours_count(workgroup_data) {
+            let neighbour_id = self.get_neighbour(workgroup_data, i);
+            let neighbour = &workgroup_data.particles[neighbour_id.id as usize];
+            if neighbour.id_global.id == self.particle.id_global.id {
                 continue;
             }
             avg_vel += neighbour.velocity;
         }
-        avg_vel /= self.neighbours.length() as f32;
+        avg_vel /= self.neighbours_count(workgroup_data) as f32;
         let delta = avg_vel - self.particle.velocity;
         self.particle.velocity += DEFAULT_VISCOSITY * delta;
     }
