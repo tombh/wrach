@@ -808,15 +808,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "heck"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c"
-dependencies = [
- "unicode-segmentation",
-]
-
-[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1527,7 +1518,7 @@ checksum = "7ef03e0a2b150c7a90d01faf6254c9c48a41e95fb2a8c2ac1c6f0d2b9aefc342"
 [[package]]
 name = "rustc_codegen_spirv"
 version = "0.4.0-alpha.12"
-source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=04146858#04146858ce1fc631717db21071b99b8101e12cda"
+source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=0866cf59#0866cf591a7fdbbd15bdb3468e192bb9b6189fd0"
 dependencies = [
  "ar",
  "bimap",
@@ -1537,13 +1528,22 @@ dependencies = [
  "num-traits",
  "rspirv",
  "rustc-demangle",
+ "rustc_codegen_spirv-types",
  "sanitize-filename",
  "serde",
  "serde_json",
  "smallvec",
  "spirv-tools",
  "syn",
- "topological-sort",
+]
+
+[[package]]
+name = "rustc_codegen_spirv-types"
+version = "0.4.0-alpha.12"
+source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=0866cf59#0866cf591a7fdbbd15bdb3468e192bb9b6189fd0"
+dependencies = [
+ "rspirv",
+ "serde",
 ]
 
 [[package]]
@@ -1687,11 +1687,12 @@ dependencies = [
 [[package]]
 name = "spirv-builder"
 version = "0.4.0-alpha.12"
-source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=04146858#04146858ce1fc631717db21071b99b8101e12cda"
+source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=0866cf59#0866cf591a7fdbbd15bdb3468e192bb9b6189fd0"
 dependencies = [
  "memchr",
  "raw-string",
  "rustc_codegen_spirv",
+ "rustc_codegen_spirv-types",
  "serde",
  "serde_json",
 ]
@@ -1699,7 +1700,7 @@ dependencies = [
 [[package]]
 name = "spirv-std"
 version = "0.4.0-alpha.12"
-source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=04146858#04146858ce1fc631717db21071b99b8101e12cda"
+source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=0866cf59#0866cf591a7fdbbd15bdb3468e192bb9b6189fd0"
 dependencies = [
  "bitflags",
  "glam",
@@ -1711,9 +1712,8 @@ dependencies = [
 [[package]]
 name = "spirv-std-macros"
 version = "0.4.0-alpha.12"
-source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=04146858#04146858ce1fc631717db21071b99b8101e12cda"
+source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=0866cf59#0866cf591a7fdbbd15bdb3468e192bb9b6189fd0"
 dependencies = [
- "heck",
  "proc-macro2",
  "quote",
  "spirv-types",
@@ -1722,9 +1722,9 @@ dependencies = [
 
 [[package]]
 name = "spirv-tools"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47ffcd721c949125c13b1213a292477a2d82621512b094564bd918c3a1c7f7ff"
+checksum = "ca7f0f689581589b0a31000317fa31257cb24d040227708718ebd9fedf5cdd2b"
 dependencies = [
  "memchr",
  "spirv-tools-sys",
@@ -1733,9 +1733,9 @@ dependencies = [
 
 [[package]]
 name = "spirv-tools-sys"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b967db819666ccf7a0373876321bfe852922edcc7f3e30e3a7668b02e1961119"
+checksum = "2980b0b4b2a9b5edfeb1dc8a35e84aac07b9c6dcd2339cce004d9355fb62a59d"
 dependencies = [
  "cc",
 ]
@@ -1743,7 +1743,7 @@ dependencies = [
 [[package]]
 name = "spirv-types"
 version = "0.4.0-alpha.12"
-source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=04146858#04146858ce1fc631717db21071b99b8101e12cda"
+source = "git+https://github.com/EmbarkStudios/rust-gpu?rev=0866cf59#0866cf591a7fdbbd15bdb3468e192bb9b6189fd0"
 
 [[package]]
 name = "strsim"
@@ -1815,22 +1815,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "topological-sort"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa7c7f42dea4b1b99439786f5633aeb9c14c1b53f75e282803c2ec2ad545873c"
-
-[[package]]
 name = "ttf-parser"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e5d7cd7ab3e47dda6e56542f4bbf3824c15234958c6e1bd6aaa347e93499fdc"
-
-[[package]]
-name = "unicode-segmentation"
-version = "1.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8895849a949e7845e06bd6dc1aa51731a103c42707010a5b591c0038fb73385b"
 
 [[package]]
 name = "unicode-width"

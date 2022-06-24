@@ -28,8 +28,8 @@ cfg-if = "1.0.0"
 
 
 [build-dependencies]
-spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "04146858", features = [ "glam" ] }
-spirv-builder = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "04146858", default-features = false }
+spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "0866cf59", features = [ "glam" ] }
+spirv-builder = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "0866cf59", default-features = false }
 
 [workspace]
 members = ["shaders"]
