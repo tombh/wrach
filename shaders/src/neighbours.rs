@@ -26,13 +26,13 @@ type Neighbourhood = [NeighbourhoodRow; INFLUENCE_ROW_SIZE];
 
 cfg_if::cfg_if! {
     if #[cfg(not(test))] {
-        const RESOLUTION: u32 = 2;
+        const GRID_RESOLUTION: u32 = 2;
     } else {
-        const RESOLUTION: u32 = 1;
+        const GRID_RESOLUTION: u32 = 1;
     }
 }
-pub const GRID_WIDTH: u32 = world::MAP_WIDTH * RESOLUTION;
-pub const GRID_HEIGHT: u32 = world::MAP_HEIGHT * RESOLUTION;
+pub const GRID_WIDTH: u32 = world::MAP_WIDTH * GRID_RESOLUTION;
+pub const GRID_HEIGHT: u32 = world::MAP_HEIGHT * GRID_RESOLUTION;
 pub const GRID_SIZE: usize = (GRID_WIDTH * GRID_HEIGHT) as usize;
 pub type PixelMapBasic = [particle::ParticleID; GRID_SIZE];
 
@@ -63,6 +63,7 @@ impl NeighbouringParticles {
         map: &mut PixelMapBasic,
     ) {
         let pixel_position = particles[id as usize].pixel_position();
+        // Remember that pixels are first class citizens and function as grids in themselves
         let coord = Self::linear_pixel_coord(
             pixel_position.x.floor() as u32,
             pixel_position.y.floor() as u32,
@@ -108,7 +109,7 @@ impl NeighbouringParticles {
     }
 
     fn range(pixel_position: f32, scale: u32) -> (u32, u32) {
-        let range = (particle::INFLUENCE_FACTOR * RESOLUTION) as f32;
+        let range = (particle::INFLUENCE_FACTOR * GRID_RESOLUTION) as f32;
         let floor = pixel_position.floor();
         let mut min = floor - range;
         let mut max = floor + range;
