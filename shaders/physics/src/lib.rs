@@ -16,7 +16,7 @@ pub mod particle;
 pub mod world;
 pub mod wrach_glam;
 
-use wrach_glam::glam::{vec4, UVec3, Vec2, Vec4};
+use wrach_glam::glam::{vec4, UVec3};
 
 #[rustfmt::skip]
 #[spirv(compute(threads(128)))]
@@ -46,18 +46,17 @@ pub fn pre_main_cs(
 #[rustfmt::skip]
 #[spirv(compute(threads(128)))]
 pub fn main_cs(
-    #[spirv(global_invocation_id)] id: UVec3,
+    #[spirv(global_invocation_id)] iduv: UVec3,
     #[spirv(push_constant)] params: &compute::Params,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
 ) {
-    compute::entry(id, params, particles_src, particles_dst, map, params.stage);
-    let id = id.x as particle::ParticleID;
+    let id = iduv.x as particle::ParticleID;
     if id >= world::NUM_PARTICLES as u32 {
         return;
     }
-    particles_dst[id as usize].color = vec4(1.0, 1.0, 1.0, 0.0);
+    compute::entry(iduv, params, particles_src, particles_dst, map, params.stage);
     if id == 450 {
         // let cp = particles_src[id as usize];
         // for i in 0..world::NUM_PARTICLES {
@@ -77,39 +76,4 @@ pub fn main_cs(
         }
         particles_dst[id as usize].color = vec4(0.0, 1.0, 0.0, 0.0);
     }
-}
-
-// Called for every index of a vertex, there are 6 in a square, because a square
-// is made up from 2 triangles
-#[spirv(vertex)]
-pub fn main_vs(
-    #[spirv(vertex_index)] _vert_id: i32,
-    #[spirv(position)] screen_position: &mut Vec4,
-    #[spirv(push_constant)] _params: &compute::Params,
-    particle_color: Vec4,
-    particle_position: Vec2,
-    _particle_velocity: Vec2,
-    _particle_gradient: Vec2,
-    vertex: Vec2,
-    output: &mut Vec4,
-) {
-    *screen_position = vec4(
-        particle_position.x + vertex.x,
-        particle_position.y + vertex.y,
-        0.0,
-        1.0,
-    );
-    *output = vec4(
-        particle_color.x,
-        particle_color.y,
-        particle_color.z,
-        particle_color.w,
-    );
-}
-
-// Basically just the colour
-
-#[spirv(fragment)]
-pub fn main_fs(#[spirv(push_constant)] _params: &compute::Params, input: Vec4, output: &mut Vec4) {
-    *output = vec4(input.x, input.y, input.z, input.w);
 }

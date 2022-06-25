@@ -90,6 +90,7 @@ impl ParticleBasic {
 
 #[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
 #[derive(Default, Clone, Copy)]
+#[repr(C)]
 pub struct Particle {
     pub id: ParticleID,
     pub position: Vec2,
@@ -161,6 +162,16 @@ impl CurrentParticle {
         }
     }
 
+    // THIS IS HORRIBLE
+    // After a refactor we suddenly needed this _second_ guard clause (as well
+    // as the one at the main entry point). It very much seems like undefined
+    // behaviour that execution for IDs above the number of particles should ever
+    // reach here, but, well it does, and I have absolutely no idea why, it's soo
+    // wrong 😭
+    fn is_id_unsafe_hack(&self) -> bool {
+        self.particle.id >= world::NUM_PARTICLES as u32
+    }
+
     pub fn predict(&mut self) {
         self.particle.velocity += world::G * DT;
         self.particle.previous = self.particle.position;
@@ -182,6 +193,9 @@ impl CurrentParticle {
     }
 
     fn solve_fluid(&mut self) {
+        if self.is_id_unsafe_hack() {
+            return;
+        }
         let mut rho = 0.0;
         let mut sum_grad2 = 0.0;
         let mut grad_i = Vec2::ZERO;
@@ -215,6 +229,9 @@ impl CurrentParticle {
     }
 
     fn propogate(&mut self) {
+        if self.is_id_unsafe_hack() {
+            return;
+        }
         let mut tmp_position = self.particle.pre_fluid_position;
         for i in 0..self.neighbours.length() {
             let neighbour = self.neighbours.get_neighbour(i);

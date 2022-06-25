@@ -1,0 +1,14 @@
+[package]
+name = "rust-gpu-compiler"
+version = "0.0.0"
+authors = []
+edition = "2018"
+
+[features]
+default = ["use-compiled-tools"]
+use-installed-tools = ["spirv-builder/use-installed-tools"]
+use-compiled-tools = ["spirv-builder/use-compiled-tools"]
+
+[dependencies]
+spirv-builder = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "0866cf591a7fdbbd15bdb3468e192bb9b6189fd0", default-features = false }
+

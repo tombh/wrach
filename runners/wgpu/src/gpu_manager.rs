@@ -1,6 +1,8 @@
 use crate::pipeline::pipeline;
 use winit;
 
+use wrach_physics_shaders as physics;
+
 pub struct GPUManager {
     pub window: winit::window::Window,
     pub instance: wgpu::Instance,
@@ -22,8 +24,8 @@ impl GPUManager {
         builder = builder
             .with_title("Wrach")
             .with_inner_size(winit::dpi::PhysicalSize::new(
-                shaders::world::MAP_WIDTH * shaders::world::WINDOW_ZOOM,
-                shaders::world::MAP_HEIGHT * shaders::world::WINDOW_ZOOM,
+                physics::world::MAP_WIDTH * physics::world::WINDOW_ZOOM,
+                physics::world::MAP_HEIGHT * physics::world::WINDOW_ZOOM,
             ));
         let window = builder.build(&event_loop).unwrap();
 
@@ -97,7 +99,7 @@ impl GPUManager {
         };
 
         surface.configure(&device, &config);
-        let pipeline = pipeline::Pipeline::init(&config, &device);
+        let pipeline = pipeline::Pipeline::init(&device);
 
         let manager = Self {
             window,

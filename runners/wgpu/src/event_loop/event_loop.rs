@@ -6,7 +6,7 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 
 use super::spawner;
 use crate::gpu_manager;
-
+use wrach_physics_shaders as physics;
 pub struct EventLoop<'instance, T: Renderer> {
     pub manager: gpu_manager::GPUManager,
     renderer: &'instance T,
@@ -20,6 +20,8 @@ pub struct EventLoop<'instance, T: Renderer> {
 }
 
 pub trait Renderer {
+    fn new(_manager: &gpu_manager::GPUManager) -> Self;
+
     fn render_pass<T: Renderer>(
         &self,
         _event_loop: &mut EventLoop<T>,
@@ -30,8 +32,17 @@ pub trait Renderer {
 }
 
 impl<'instance, T: Renderer> EventLoop<'instance, T> {
-    pub fn run(renderer: &'instance T) {
+    pub fn start() {
         let (manager, event_loop) = pollster::block_on(gpu_manager::GPUManager::setup());
+        let renderer = T::new(&manager);
+        EventLoop::run(manager, &renderer, event_loop);
+    }
+
+    fn run(
+        manager: gpu_manager::GPUManager,
+        renderer: &'instance T,
+        event_loop: winit::event_loop::EventLoop<()>,
+    ) {
         let instance = Self {
             manager,
             renderer,
@@ -46,7 +57,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         instance.enter(event_loop)
     }
 
-    pub fn enter(mut self, mut event_loop: winit::event_loop::EventLoop<()>) {
+    fn enter(mut self, mut event_loop: winit::event_loop::EventLoop<()>) {
         log::info!("Entering render loop...");
         event_loop.run_return(move |event, _, control_flow| {
             // Only captured so they're droppped
@@ -216,7 +227,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         self.pre_compute_pass(command_encoder);
         command_encoder.push_debug_group("compute");
         {
-            for _ in 0..shaders::particle::DEFAULT_NUM_SOLVER_SUBSTEPS {
+            for _ in 0..physics::particle::DEFAULT_NUM_SOLVER_SUBSTEPS {
                 self.compute_pass_stage(command_encoder, 0);
                 self.compute_pass_stage(command_encoder, 1);
                 self.compute_pass_stage(command_encoder, 2);
@@ -243,7 +254,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.compute_pipeline);
 
-        let ps = shaders::compute::Params { stage };
+        let ps = physics::compute::Params { stage };
         cpass.set_push_constants(0, bytemuck::bytes_of(&ps.as_std140()));
         cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
     }

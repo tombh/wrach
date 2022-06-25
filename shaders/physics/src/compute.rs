@@ -40,6 +40,7 @@ pub fn entry(
         2 => particles_src[id].propogate(id as particle::ParticleID, neighbours),
         _ => (),
     }
-    // TODO don't write to particles_src
+
+    // TODO: shouldn't this be handled in the methods above?
     particles_dst[id] = particles_src[id];
 }

@@ -1,53 +1,24 @@
-[package]
-name = "wrach"
-version = "0.0.0"
-authors = []
-edition = "2018"
-resolver = "2"
-
-[features]
-default = ["use-compiled-tools"]
-use-installed-tools = ["spirv-builder/use-installed-tools"]
-use-compiled-tools = ["spirv-builder/use-compiled-tools"]
-
-[dependencies]
-shaders = { path = "shaders" }
-futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
-wgpu = { version = "0.11.0", features = ["spirv"] }
-wgpu-hal = "=0.11.2"
-winit = { version = "0.25", features = ["web-sys"] }
-bytemuck = "1.7.2"
-crevice = { version = "0.8.0", features = ["glam"] }
-rand = "0.7.2"
-cgmath = "0.18.0"
-env_logger = "0.9.0"
-async-executor = "1.4.1"
-pollster = "0.2.4"
-log = "0.4.14"
-cfg-if = "1.0.0"
-
-
-[build-dependencies]
-spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "0866cf59", features = [ "glam" ] }
-spirv-builder = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "0866cf59", default-features = false }
-
 [workspace]
-members = ["shaders"]
+resolver = "2"
+members = [
+	"shaders/rust-gpu-compiler",
+	"shaders/physics",
+	"shaders/renderer",
+	"runners/wgpu",
+	"examples/basic"
+]
 
-# Compile build-dependencies in release mode with
-# the same settings as regular dependencies.
+# Enable incremental by default in release mode.
+[profile.release]
+incremental = true
+# HACK(eddyb) this is the default but without explicitly specifying it, Cargo
+# will treat the identical settings in `[profile.release.build-override]` below
+# as different sets of `rustc` flags and will not reuse artifacts between them.
+codegen-units = 256
+
+# Compile build-dependencies in release mode with the same settings
+# as regular dependencies (including the incremental enabled above).
 [profile.release.build-override]
 opt-level = 3
-codegen-units = 16
-
-# HACK(eddyb) also compile debug mode's build-dependencies with optimizations,
-# because otherwise `rustc_codegen_spirv` (esspecially its linker) is too slow.
-# Also `spirv-opt` *alone* takes (just) over an hour to run, though this only
-# brings it down only to 10 minutes, so I've disabled it below, for now.
-[profile.dev.build-override]
-opt-level = 3
-
-# HACK(eddyb) don't optimize the shader crate, to avoid `spirv-opt` taking
-# a long time (10 minutes if itself was optimized, over an hour otherwise).
-[profile.release.package."shaders"]
-opt-level = 0
+incremental = true
+codegen-units = 256

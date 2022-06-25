@@ -1,5 +1,5 @@
 [package]
-name = "shaders"
+name = "wrach-physics-shaders"
 version = "0.0.0"
 authors = []
 edition = "2018"
@@ -8,7 +8,7 @@ edition = "2018"
 crate-type = ["dylib"]
 
 [dependencies]
-spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "0866cf59", features = [ "glam" ] }
+spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", features = [ "glam" ] }
 cfg-if = "1.0.0"
 
 [target.'cfg(not(target_arch = "spirv"))'.dependencies]

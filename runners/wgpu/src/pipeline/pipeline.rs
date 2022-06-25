@@ -3,7 +3,9 @@ use wgpu::util::DeviceExt;
 
 use super::builder;
 
-const NUM_PARTICLES: u32 = shaders::world::NUM_PARTICLES as u32;
+use wrach_physics_shaders as physics;
+
+const NUM_PARTICLES: u32 = physics::world::NUM_PARTICLES as u32;
 
 // number of single-particle calculations (invocations) in each gpu work group
 const PARTICLES_PER_GROUP: u32 = 128;
@@ -11,24 +13,21 @@ const PARTICLES_PER_GROUP: u32 = 128;
 pub struct Pipeline {
     pub particle_bind_groups: Vec<wgpu::BindGroup>,
     pub particle_buffers: Vec<wgpu::Buffer>,
-    pub vertices_buffer: wgpu::Buffer,
     pub params_buffer: wgpu::Buffer,
     pub grid_buffer: wgpu::Buffer,
     pub pre_compute_pipeline: wgpu::ComputePipeline,
     pub compute_pipeline: wgpu::ComputePipeline,
-    pub render_pipeline: wgpu::RenderPipeline,
     pub work_group_count: u32,
     pub bind_group: usize,
 }
 
 impl Pipeline {
-    pub fn init(config: &wgpu::SurfaceConfiguration, device: &wgpu::Device) -> Self {
-        let mut builder = builder::Builder::new(config, device);
+    pub fn init(device: &wgpu::Device) -> Self {
+        let mut builder = builder::Builder::new(device);
 
-        let shader_binary = wgpu::include_spirv!(env!("shaders.spv"));
-        let shader_module = device.create_shader_module(&shader_binary);
+        let shader_module = builder::Builder::shader(device, "shaders/physics");
 
-        let params_buffer = builder.params_buffer(shaders::compute::Params { stage: 0 });
+        let params_buffer = builder.params_buffer(physics::compute::Params { stage: 0 });
 
         let compute_bind_group_layout = builder.compute_bind_group_layout();
         let compute_pipeline_layout =
@@ -37,7 +36,7 @@ impl Pipeline {
                 bind_group_layouts: &[&compute_bind_group_layout],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::COMPUTE,
-                    range: 0..std::mem::size_of::<shaders::compute::Std140Params>() as u32,
+                    range: 0..std::mem::size_of::<physics::compute::Std140Params>() as u32,
                 }],
             });
 
@@ -56,9 +55,6 @@ impl Pipeline {
             entry_point: "main_cs",
         });
 
-        let render_pipeline = builder.render_pipeline(&shader_module);
-        let vertices_buffer = builder.init_vertices_buffer();
-
         let initial_particle_data = builder.init_particle_buffer();
 
         let mut particle_buffers = Vec::<wgpu::Buffer>::new();
@@ -75,7 +71,7 @@ impl Pipeline {
             );
         }
 
-        let grid: shaders::neighbours::PixelMapBasic = [0; shaders::neighbours::GRID_SIZE];
+        let grid: physics::neighbours::PixelMapBasic = [0; physics::neighbours::GRID_SIZE];
         let grid_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Pixel Map")),
             contents: bytemuck::cast_slice(&grid),
@@ -116,12 +112,10 @@ impl Pipeline {
         Self {
             particle_bind_groups,
             particle_buffers,
-            vertices_buffer,
             params_buffer,
             grid_buffer,
             pre_compute_pipeline,
             compute_pipeline,
-            render_pipeline,
             work_group_count,
             bind_group: 0,
         }
