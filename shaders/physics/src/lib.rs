@@ -27,15 +27,6 @@ pub fn pre_main_cs(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] _particles_dst: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
 ) {
-    // Prevents the work item continuing until all work items in workgroup have reached it
-    // unsafe {
-    //     use spirv_std::memory::{Scope, Semantics};
-    //     spirv_std::arch::control_barrier::<
-    //         { Scope::Workgroup as u32 },
-    //         { Scope::Workgroup as u32 },
-    //         { Semantics::NONE.bits() },
-    //     >();
-    // }
     let id = id.x as particle::ParticleID;
     if id >= world::NUM_PARTICLES as u32 {
         return;
@@ -56,17 +47,24 @@ pub fn main_cs(
     if id >= world::NUM_PARTICLES as u32 {
         return;
     }
-    compute::entry(iduv, params, particles_src, particles_dst, map, params.stage);
+    compute::entry(iduv, params, particles_src, particles_dst, map, 0);
+}
+
+#[rustfmt::skip]
+#[spirv(compute(threads(128)))]
+pub fn post_main_cs(
+    #[spirv(global_invocation_id)] iduv: UVec3,
+    #[spirv(push_constant)] params: &compute::Params,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
+) {
+    let id = iduv.x as particle::ParticleID;
+    if id >= world::NUM_PARTICLES as u32 {
+        return;
+    }
+    compute::entry(iduv, params, particles_src, particles_dst, map, 1);
     if id == 450 {
-        // let cp = particles_src[id as usize];
-        // for i in 0..world::NUM_PARTICLES {
-        //     let np = particles_src[i];
-        //     let distance = np.position.distance(cp.position);
-        //     if distance < particle::PARTICLE_INFLUENCE {
-        //         _particles_dst[i].color = vec4(1.0, 0.0, 0.0, 0.0);
-        //     }
-        // }
-        //
         let mut neighbours =
         neighbours::NeighbouringParticles::find(id as particle::ParticleID, map, particles_src);
         for n in 0..neighbours.length() {

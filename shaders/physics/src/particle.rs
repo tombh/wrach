@@ -54,37 +54,24 @@ impl ParticleBasic {
         CurrentParticle::new(id, *self, neighbours)
     }
 
-    pub fn predict(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
-        let mut current_particle = self.to_current_particle(id, neighbours);
-        current_particle.predict();
-        self.position = current_particle.particle.position;
-        self.previous = current_particle.particle.previous;
-        self.pre_fluid_position = current_particle.particle.pre_fluid_position;
-        self.velocity = current_particle.particle.velocity;
-        self.lambda = current_particle.particle.lambda;
-        self.color = current_particle.particle.color;
-    }
-
-    pub fn update(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
+    pub fn compute(
+        &mut self,
+        id: ParticleID,
+        neighbours: neighbours::NeighbouringParticles,
+    ) -> Particle {
         let mut current_particle = self.to_current_particle(id, neighbours);
         current_particle.compute();
-        self.position = current_particle.particle.position;
-        self.previous = current_particle.particle.previous;
-        self.pre_fluid_position = current_particle.particle.pre_fluid_position;
-        self.velocity = current_particle.particle.velocity;
-        self.lambda = current_particle.particle.lambda;
-        self.color = current_particle.particle.color;
+        current_particle.particle
     }
 
-    pub fn propogate(&mut self, id: ParticleID, neighbours: neighbours::NeighbouringParticles) {
+    pub fn propogate(
+        &mut self,
+        id: ParticleID,
+        neighbours: neighbours::NeighbouringParticles,
+    ) -> Particle {
         let mut current_particle = self.to_current_particle(id, neighbours);
         current_particle.propogate();
-        self.position = current_particle.particle.position;
-        self.previous = current_particle.particle.previous;
-        self.pre_fluid_position = current_particle.particle.pre_fluid_position;
-        self.velocity = current_particle.particle.velocity;
-        self.lambda = current_particle.particle.lambda;
-        self.color = current_particle.particle.color;
+        current_particle.particle
     }
 }
 
@@ -112,6 +99,13 @@ impl Particle {
             lambda: particle_basic.lambda,
             color: particle_basic.color,
         }
+    }
+
+    // TODO: explain
+    pub fn predict(&mut self) {
+        self.velocity += world::G * DT;
+        self.previous = self.position;
+        self.position += self.velocity * DT;
     }
 }
 
@@ -172,15 +166,10 @@ impl CurrentParticle {
         self.particle.id >= world::NUM_PARTICLES as u32
     }
 
-    pub fn predict(&mut self) {
-        self.particle.velocity += world::G * DT;
-        self.particle.previous = self.particle.position;
-        self.particle.position += self.particle.velocity * DT;
+    pub fn compute(&mut self) {
+        self.particle.predict();
         self.solve_boundaries();
         self.particle.pre_fluid_position = self.particle.position;
-    }
-
-    pub fn compute(&mut self) {
         self.solve_fluid();
     }
 
@@ -200,7 +189,10 @@ impl CurrentParticle {
         let mut sum_grad2 = 0.0;
         let mut grad_i = Vec2::ZERO;
         for i in 0..self.neighbours.length() {
-            let neighbour = self.neighbours.get_neighbour(i);
+            let mut neighbour = self.neighbours.get_neighbour(i);
+            if neighbour.id != self.particle.id {
+                neighbour.predict();
+            }
             // TODO reuse the length from grid search?
             let mut n = neighbour.position - self.particle.position;
             let r = n.length();

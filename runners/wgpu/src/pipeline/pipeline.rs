@@ -17,6 +17,7 @@ pub struct Pipeline {
     pub grid_buffer: wgpu::Buffer,
     pub pre_compute_pipeline: wgpu::ComputePipeline,
     pub compute_pipeline: wgpu::ComputePipeline,
+    pub post_compute_pipeline: wgpu::ComputePipeline,
     pub work_group_count: u32,
     pub bind_group: usize,
 }
@@ -54,6 +55,14 @@ impl Pipeline {
             module: &shader_module,
             entry_point: "main_cs",
         });
+
+        let post_compute_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Post compute pipeline"),
+                layout: Some(&compute_pipeline_layout),
+                module: &shader_module,
+                entry_point: "post_main_cs",
+            });
 
         let initial_particle_data = builder.init_particle_buffer();
 
@@ -116,6 +125,7 @@ impl Pipeline {
             grid_buffer,
             pre_compute_pipeline,
             compute_pipeline,
+            post_compute_pipeline,
             work_group_count,
             bind_group: 0,
         }

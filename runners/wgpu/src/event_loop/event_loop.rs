@@ -225,12 +225,12 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
     fn compute_pass(&mut self, command_encoder: &mut wgpu::CommandEncoder) {
         command_encoder.clear_buffer(&self.manager.pipeline.grid_buffer, 0, None);
         self.pre_compute_pass(command_encoder);
+
         command_encoder.push_debug_group("compute");
         {
             for _ in 0..physics::particle::DEFAULT_NUM_SOLVER_SUBSTEPS {
-                self.compute_pass_stage(command_encoder, 0);
-                self.compute_pass_stage(command_encoder, 1);
-                self.compute_pass_stage(command_encoder, 2);
+                self.compute_pass_stage(command_encoder);
+                self.post_compute_pass_stage(command_encoder);
             }
         }
         command_encoder.pop_debug_group();
@@ -246,7 +246,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
     }
 
-    fn compute_pass_stage(&mut self, command_encoder: &mut wgpu::CommandEncoder, stage: u32) {
+    fn compute_pass_stage(&mut self, command_encoder: &mut wgpu::CommandEncoder) {
         let mut cpass =
             command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
         let index = self.bind_group_index_toggled();
@@ -254,7 +254,20 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.compute_pipeline);
 
-        let ps = physics::compute::Params { stage };
+        let ps = physics::compute::Params { stage: 0 };
+        cpass.set_push_constants(0, bytemuck::bytes_of(&ps.as_std140()));
+        cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
+    }
+
+    fn post_compute_pass_stage(&mut self, command_encoder: &mut wgpu::CommandEncoder) {
+        let mut cpass =
+            command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
+        let index = self.bind_group_index_toggled();
+        let bind_groups = &self.manager.pipeline.particle_bind_groups[index];
+        cpass.set_bind_group(0, bind_groups, &[]);
+        cpass.set_pipeline(&self.manager.pipeline.post_compute_pipeline);
+
+        let ps = physics::compute::Params { stage: 0 };
         cpass.set_push_constants(0, bytemuck::bytes_of(&ps.as_std140()));
         cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
     }
