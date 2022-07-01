@@ -250,8 +250,13 @@ impl CurrentParticle {
         let vel = v.length();
 
         // CFL
-        if vel > MAX_VEL {
-            v *= MAX_VEL / vel;
+        let max_velocity = if self.particle.id == 450 {
+            MAX_VEL * 2.0
+        } else {
+            MAX_VEL
+        };
+        if vel > max_velocity {
+            v *= max_velocity / vel;
             self.particle.position = self.particle.previous + v;
         }
         self.particle.velocity = v / DT;

@@ -28,7 +28,7 @@ impl Pipeline {
 
         let shader_module = builder::Builder::shader(device, "shaders/physics");
 
-        let params_buffer = builder.params_buffer(physics::compute::Params { stage: 0 });
+        let params_buffer = builder.params_buffer(physics::compute::Params::default());
 
         let compute_bind_group_layout = builder.compute_bind_group_layout();
         let compute_pipeline_layout =

@@ -17,6 +17,7 @@ pub struct EventLoop<'instance, T: Renderer> {
     last_update_inst: Instant,
     frame_count: u64,
     accum_time: f32,
+    params: physics::compute::Params,
 }
 
 pub trait Renderer {
@@ -53,6 +54,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
             last_frame_inst: Instant::now(),
             frame_count: 0,
             accum_time: 0.0,
+            params: physics::compute::Params::default(),
         };
         instance.enter(event_loop)
     }
@@ -119,6 +121,39 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
                         println!("R");
                         // println!("{:#?}", instance.generate_report());
                     }
+
+                    // Up
+                    (event::VirtualKeyCode::Up, event::ElementState::Pressed) => {
+                        self.params.up = 1;
+                    }
+                    (event::VirtualKeyCode::Up, event::ElementState::Released) => {
+                        self.params.up = 0;
+                    }
+
+                    // Down
+                    (event::VirtualKeyCode::Down, event::ElementState::Pressed) => {
+                        self.params.down = 1;
+                    }
+                    (event::VirtualKeyCode::Down, event::ElementState::Released) => {
+                        self.params.down = 0;
+                    }
+
+                    // Left
+                    (event::VirtualKeyCode::Left, event::ElementState::Pressed) => {
+                        self.params.left = 1;
+                    }
+                    (event::VirtualKeyCode::Left, event::ElementState::Released) => {
+                        self.params.left = 0;
+                    }
+
+                    // Right
+                    (event::VirtualKeyCode::Right, event::ElementState::Pressed) => {
+                        self.params.right = 1;
+                    }
+                    (event::VirtualKeyCode::Right, event::ElementState::Released) => {
+                        self.params.right = 0;
+                    }
+
                     (event::VirtualKeyCode::Space, event::ElementState::Pressed) => {
                         self.toggle_pause();
                     }
@@ -254,8 +289,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.compute_pipeline);
 
-        let ps = physics::compute::Params { stage: 0 };
-        cpass.set_push_constants(0, bytemuck::bytes_of(&ps.as_std140()));
+        cpass.set_push_constants(0, bytemuck::bytes_of(&self.params.as_std140()));
         cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
     }
 
@@ -267,8 +301,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.post_compute_pipeline);
 
-        let ps = physics::compute::Params { stage: 0 };
-        cpass.set_push_constants(0, bytemuck::bytes_of(&ps.as_std140()));
+        cpass.set_push_constants(0, bytemuck::bytes_of(&self.params.as_std140()));
         cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
     }
 }

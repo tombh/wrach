@@ -13,7 +13,10 @@ use crate::world;
 #[derive(Default, Copy, Clone)]
 #[repr(C)]
 pub struct Params {
-    pub stage: u32,
+    pub up: u32,
+    pub down: u32,
+    pub left: u32,
+    pub right: u32,
 }
 
 // Crevice doesn't support enums, so maybe define this with bytemuck?

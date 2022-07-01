@@ -73,5 +73,23 @@ pub fn post_main_cs(
 
         }
         particles_dst[id as usize].color = vec4(0.0, 1.0, 0.0, 0.0);
+          
+        let delta = 0.03;
+        if params.up > 0 {
+            particles_dst[id as usize].velocity.y += delta;
+        }
+
+        if params.down > 0 {
+            particles_dst[id as usize].velocity.y -= delta;
+        }
+
+        if params.left > 0 {
+            particles_dst[id as usize].velocity.x -= delta;
+        }
+
+        if params.right > 0 {
+            particles_dst[id as usize].velocity.x += delta;
+        }
+
     }
 }
