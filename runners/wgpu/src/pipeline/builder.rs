@@ -37,6 +37,8 @@ impl<'a> Builder<'a> {
         let sizeof_particle = std::mem::size_of::<physics::particle::Std140ParticleBasic>();
         let sizeof_particles = (sizeof_particle * physics::world::NUM_PARTICLES as usize) as u64;
         let sizeof_params = std::mem::size_of::<physics::compute::Params>() as u64;
+        let neighbourhood_ids_size = (std::mem::size_of::<physics::neighbours::NeighbourhoodIDs>()
+            * physics::world::NUM_PARTICLES) as u64;
 
         let bind_groups = [
             wgpu::BindGroupLayoutEntry {
@@ -82,6 +84,16 @@ impl<'a> Builder<'a> {
                     min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<
                         physics::neighbours::PixelMapBasic,
                     >() as u64),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(neighbourhood_ids_size),
                 },
                 count: None,
             },

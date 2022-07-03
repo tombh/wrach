@@ -26,6 +26,7 @@ pub fn pre_main_cs(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] _particles_dst: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] _neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
 ) {
     let id = id.x as particle::ParticleID;
     if id >= world::NUM_PARTICLES as u32 {
@@ -42,12 +43,19 @@ pub fn main_cs(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
 ) {
     let id = iduv.x as particle::ParticleID;
     if id >= world::NUM_PARTICLES as u32 {
         return;
     }
-    compute::entry(iduv, params, particles_src, particles_dst, map, 0);
+    neighbours::NeighbouringParticles::find(
+        id as particle::ParticleID,
+        map,
+        particles_src,
+        neighbourhood_ids,
+    );
+    compute::entry(iduv, params, particles_src, particles_dst, map, neighbourhood_ids, 0);
 }
 
 #[rustfmt::skip]
@@ -58,22 +66,27 @@ pub fn post_main_cs(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
     #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
 ) {
     let id = iduv.x as particle::ParticleID;
     if id >= world::NUM_PARTICLES as u32 {
         return;
     }
-    compute::entry(iduv, params, particles_src, particles_dst, map, 1);
+    compute::entry(iduv, params, particles_src, particles_dst, map, neighbourhood_ids, 1);
     if id == 450 {
         let mut neighbours =
-        neighbours::NeighbouringParticles::find(id as particle::ParticleID, map, particles_src);
+        neighbours::NeighbouringParticles::recruit(
+            id as particle::ParticleID,
+            particles_src,
+            neighbourhood_ids
+        );
         for n in 0..neighbours.length() {
             let np = neighbours.get_neighbour(n);
             particles_dst[np.id as usize].color = vec4(1.0, 0.0, 0.0, 0.0);
 
         }
         particles_dst[id as usize].color = vec4(0.0, 1.0, 0.0, 0.0);
-          
+
         let delta = 0.03;
         if params.up > 0 {
             particles_dst[id as usize].velocity.y += delta;

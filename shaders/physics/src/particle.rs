@@ -32,7 +32,7 @@ const DT: f32 = TIME_STEP / DEFAULT_NUM_SOLVER_SUBSTEPS as f32;
 
 pub type ParticleID = u32;
 
-// Field order matters!! Because of std140, wgpu, spirv, etc
+// Field order matters!! Because of renderer vertex buffer
 #[cfg_attr(not(target_arch = "spirv"), derive(AsStd140, Debug))]
 #[derive(Default, Copy, Clone)]
 #[repr(C)]

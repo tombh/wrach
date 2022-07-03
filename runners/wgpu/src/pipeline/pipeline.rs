@@ -87,6 +87,15 @@ impl Pipeline {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
+        let neighbourhood_ids: physics::neighbours::NeighbourhoodIDsBuffer =
+            [[0; physics::neighbours::MAX_NEIGHBOURS_WITH_COUNT]; physics::world::NUM_PARTICLES];
+        let neighbourhood_ids_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Neighbourhood IDs")),
+                contents: bytemuck::cast_slice(&neighbourhood_ids),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            });
+
         // create two bind groups, one for each buffer as the src
         // where the alternate buffer is used as the dst
         for i in 0..2 {
@@ -108,6 +117,10 @@ impl Pipeline {
                     wgpu::BindGroupEntry {
                         binding: 3,
                         resource: grid_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: neighbourhood_ids_buffer.as_entire_binding(),
                     },
                 ],
                 label: None,

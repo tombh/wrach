@@ -5,7 +5,7 @@ authors = []
 edition = "2018"
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["rlib", "dylib"]
 
 [dependencies]
 spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", features = [ "glam" ] }

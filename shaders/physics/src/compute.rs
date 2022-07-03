@@ -30,15 +30,19 @@ pub fn entry(
     _params: &Params,
     particles_src: &mut particle::Particles,
     particles_dst: &mut particle::Particles,
-    grid: &neighbours::PixelMapBasic,
+    _grid: &neighbours::PixelMapBasic,
+    neighbourhood_ids_buffer: &neighbours::NeighbourhoodIDsBuffer,
     stage: u32,
 ) {
     let id = id.x as usize;
     if id >= world::NUM_PARTICLES {
         return;
     }
-    let neighbours =
-        neighbours::NeighbouringParticles::find(id as particle::ParticleID, grid, particles_src);
+    let neighbours = neighbours::NeighbouringParticles::recruit(
+        id as particle::ParticleID,
+        particles_src,
+        neighbourhood_ids_buffer,
+    );
     let particle = match stage {
         0 => particles_src[id].compute(id as particle::ParticleID, neighbours),
         1 => particles_src[id].propogate(id as particle::ParticleID, neighbours),
