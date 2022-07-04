@@ -50,12 +50,10 @@ pub fn entry(
     };
 
     let particle_basic = ParticleBasic {
-        color: particle.color,
         lambda: particle.lambda,
         position: particle.position,
         previous: particle.previous,
         velocity: particle.velocity,
-        pre_fluid_position: particle.pre_fluid_position,
     };
 
     // TODO: shouldn't this be handled in the methods above?

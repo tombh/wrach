@@ -43,13 +43,13 @@ impl SquareVertex {
                         array_stride: particle_array_stride,
                         step_mode: wgpu::VertexStepMode::Instance,
                         attributes: &wgpu::vertex_attr_array![
-                            0 => Float32x4, 1 => Float32x2, 2 => Float32x2, 3 => Float32x2
+                            0 => Float32x2, 1 => Float32x2
                         ],
                     },
                     wgpu::VertexBufferLayout {
                         array_stride: 1 * 8,
                         step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![4 => Float32x2],
+                        attributes: &wgpu::vertex_attr_array![2 => Float32x2],
                     },
                 ],
             },

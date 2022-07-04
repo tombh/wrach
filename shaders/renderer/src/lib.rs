@@ -16,15 +16,18 @@ use spirv_std::glam::{vec4, Vec2, Vec4};
 // is made up from 2 triangles
 #[spirv(vertex)]
 pub fn main_vs(
+    #[spirv(instance_index)] id: i32,
     #[spirv(vertex_index)] _vert_id: i32,
     #[spirv(position)] screen_position: &mut Vec4,
-    particle_color: Vec4,
     particle_position: Vec2,
     _particle_velocity: Vec2,
-    _particle_gradient: Vec2,
     vertex: Vec2,
     output: &mut Vec4,
 ) {
+    let mut particle_color = vec4(1.0, 1.0, 1.0, 0.0);
+    if id == 450 {
+        particle_color = vec4(0.0, 1.0, 0.0, 0.0);
+    }
     *screen_position = vec4(
         particle_position.x + vertex.x,
         particle_position.y + vertex.y,

@@ -1,6 +1,6 @@
 use crevice::std140::AsStd140;
 
-use physics::wrach_glam::glam::{vec2, vec4};
+use physics::wrach_glam::glam::vec2;
 use wgpu::{util::DeviceExt, ShaderModule};
 use wrach_physics_shaders as physics;
 
@@ -123,10 +123,8 @@ impl<'a> Builder<'a> {
             loop {
                 let position = vec2(x, y); // * (1.0 + rng.gen_range(-jitter, jitter));
                 let particle = physics::particle::ParticleBasic {
-                    color: vec4(1.0, 1.0, 1.0, 1.0),
                     position,
                     previous: position,
-                    pre_fluid_position: position,
                     velocity: vec2(
                         rng.gen_range(-jitter, jitter),
                         rng.gen_range(-jitter, jitter),

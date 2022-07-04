@@ -16,7 +16,7 @@ pub mod particle;
 pub mod world;
 pub mod wrach_glam;
 
-use wrach_glam::glam::{vec4, UVec3};
+use wrach_glam::glam::UVec3;
 
 #[rustfmt::skip]
 #[spirv(compute(threads(128)))]
@@ -74,18 +74,18 @@ pub fn post_main_cs(
     }
     compute::entry(iduv, params, particles_src, particles_dst, map, neighbourhood_ids, 1);
     if id == 450 {
-        let mut neighbours =
-        neighbours::NeighbouringParticles::recruit(
-            id as particle::ParticleID,
-            particles_src,
-            neighbourhood_ids
-        );
-        for n in 0..neighbours.length() {
-            let np = neighbours.get_neighbour(n);
-            particles_dst[np.id as usize].color = vec4(1.0, 0.0, 0.0, 0.0);
-
-        }
-        particles_dst[id as usize].color = vec4(0.0, 1.0, 0.0, 0.0);
+        // let mut neighbours =
+        // neighbours::NeighbouringParticles::recruit(
+        //     id as particle::ParticleID,
+        //     particles_src,
+        //     neighbourhood_ids
+        // );
+        // for n in 0..neighbours.length() {
+        //     let np = neighbours.get_neighbour(n);
+        //     particles_dst[np.id as usize].color = vec4(1.0, 0.0, 0.0, 0.0);
+        //
+        // }
+        // particles_dst[id as usize].color = vec4(0.0, 1.0, 0.0, 0.0);
 
         let delta = 0.03;
         if params.up > 0 {

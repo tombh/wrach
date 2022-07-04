@@ -3,7 +3,7 @@ use crevice::std140::AsStd140;
 
 use crate::neighbours;
 use crate::world;
-use crate::wrach_glam::glam::{vec2, Vec2, Vec4};
+use crate::wrach_glam::glam::{vec2, Vec2};
 
 use core::f32::consts::PI;
 
@@ -37,11 +37,9 @@ pub type ParticleID = u32;
 #[derive(Default, Copy, Clone)]
 #[repr(C)]
 pub struct ParticleBasic {
-    pub color: Vec4,
     pub position: Vec2,
-    pub previous: Vec2,
-    pub pre_fluid_position: Vec2,
     pub velocity: Vec2,
+    pub previous: Vec2,
     pub lambda: f32,
 }
 
@@ -85,20 +83,20 @@ pub struct Particle {
     pub pre_fluid_position: Vec2,
     pub velocity: Vec2,
     pub lambda: f32,
-    pub color: Vec4,
 }
 
 impl Particle {
     pub fn new(id: ParticleID, particle_basic: ParticleBasic) -> Particle {
-        Particle {
+        let mut particle = Particle {
             id,
             position: particle_basic.position,
             previous: particle_basic.previous,
-            pre_fluid_position: particle_basic.pre_fluid_position,
+            pre_fluid_position: Vec2::ZERO,
             velocity: particle_basic.velocity,
             lambda: particle_basic.lambda,
-            color: particle_basic.color,
-        }
+        };
+        particle.update_pre_fluid_position();
+        particle
     }
 
     // TODO: explain
@@ -106,6 +104,11 @@ impl Particle {
         self.velocity += world::G * DT;
         self.previous = self.position;
         self.position += self.velocity * DT;
+    }
+
+    // Because maths is much cheaper than memory access
+    fn update_pre_fluid_position(&mut self) {
+        self.pre_fluid_position = self.previous + (self.velocity * DT);
     }
 }
 
@@ -167,16 +170,14 @@ impl CurrentParticle {
     }
 
     pub fn compute(&mut self) {
-        self.particle.predict();
         self.solve_boundaries();
-        self.particle.pre_fluid_position = self.particle.position;
+        self.particle.predict();
         self.solve_fluid();
     }
 
     fn solve_boundaries(&mut self) {
         let wall = 0.95;
         let p = &mut self.particle.position;
-
         p.y = p.y.clamp(-wall, wall);
         p.x = p.x.clamp(-wall, wall);
     }
