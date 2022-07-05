@@ -3,7 +3,7 @@ use crevice::std140::AsStd140;
 
 use crate::neighbours;
 use crate::world;
-use crate::wrach_glam::glam::{vec2, Vec2};
+use crate::wrach_glam::glam::Vec2;
 
 use core::f32::consts::PI;
 
@@ -32,71 +32,52 @@ const DT: f32 = TIME_STEP / DEFAULT_NUM_SOLVER_SUBSTEPS as f32;
 
 pub type ParticleID = u32;
 
-// Field order matters!! Because of renderer vertex buffer
+pub type ParticlePosition = Vec2;
+pub type ParticlePositions = [ParticlePosition; world::NUM_PARTICLES];
+
+pub type ParticleVelocity = Vec2;
+pub type ParticleVelocities = [ParticleVelocity; world::NUM_PARTICLES];
+
 #[cfg_attr(not(target_arch = "spirv"), derive(AsStd140, Debug))]
 #[derive(Default, Copy, Clone)]
 #[repr(C)]
-pub struct ParticleBasic {
-    pub position: Vec2,
-    pub velocity: Vec2,
+pub struct ParticlePropogation {
     pub previous: Vec2,
     pub lambda: f32,
 }
-
-impl ParticleBasic {
-    fn to_current_particle(
-        &self,
-        id: ParticleID,
-        neighbours: neighbours::NeighbouringParticles,
-    ) -> CurrentParticle {
-        CurrentParticle::new(id, *self, neighbours)
-    }
-
-    pub fn compute(
-        &mut self,
-        id: ParticleID,
-        neighbours: neighbours::NeighbouringParticles,
-    ) -> Particle {
-        let mut current_particle = self.to_current_particle(id, neighbours);
-        current_particle.compute();
-        current_particle.particle
-    }
-
-    pub fn propogate(
-        &mut self,
-        id: ParticleID,
-        neighbours: neighbours::NeighbouringParticles,
-    ) -> Particle {
-        let mut current_particle = self.to_current_particle(id, neighbours);
-        current_particle.propogate();
-        current_particle.particle
-    }
-}
+pub type ParticlePropogations = [ParticlePropogation; world::NUM_PARTICLES];
 
 #[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
 #[derive(Default, Clone, Copy)]
 #[repr(C)]
 pub struct Particle {
     pub id: ParticleID,
-    pub position: Vec2,
-    pub previous: Vec2,
+    pub position: ParticlePosition,
+    pub previous: ParticlePosition,
     pub pre_fluid_position: Vec2,
-    pub velocity: Vec2,
+    pub velocity: ParticleVelocity,
     pub lambda: f32,
 }
 
 impl Particle {
-    pub fn new(id: ParticleID, particle_basic: ParticleBasic) -> Particle {
+    pub fn new(particle: Particle) -> Particle {
         let mut particle = Particle {
-            id,
-            position: particle_basic.position,
-            previous: particle_basic.previous,
+            id: particle.id,
+            position: particle.position,
+            previous: particle.previous,
             pre_fluid_position: Vec2::ZERO,
-            velocity: particle_basic.velocity,
-            lambda: particle_basic.lambda,
+            velocity: particle.velocity,
+            lambda: particle.lambda,
         };
         particle.update_pre_fluid_position();
         particle
+    }
+
+    fn to_current_particle(
+        &self,
+        neighbours: neighbours::NeighbouringParticles,
+    ) -> CurrentParticle {
+        CurrentParticle::new(*self, neighbours)
     }
 
     // TODO: explain
@@ -110,36 +91,19 @@ impl Particle {
     fn update_pre_fluid_position(&mut self) {
         self.pre_fluid_position = self.previous + (self.velocity * DT);
     }
-}
 
-pub trait ParticleaAsPixel {
-    fn pixel_position(&self) -> Vec2 {
-        vec2(0.0, 0.0)
+    pub fn compute(&mut self, neighbours: neighbours::NeighbouringParticles) -> Particle {
+        let mut current_particle = self.to_current_particle(neighbours);
+        current_particle.compute();
+        current_particle.particle
     }
-    fn scale(&self, position: f32, scale: u32) -> f32 {
-        ((position + 1.0) / 2.0) * (scale - 1) as f32
-    }
-}
 
-// TODO: is there a way to de-duplicate these?
-impl ParticleaAsPixel for Particle {
-    fn pixel_position(&self) -> Vec2 {
-        vec2(
-            self.scale(self.position.x, neighbours::GRID_WIDTH),
-            self.scale(self.position.y, neighbours::GRID_HEIGHT),
-        )
+    pub fn propogate(&mut self, neighbours: neighbours::NeighbouringParticles) -> Particle {
+        let mut current_particle = self.to_current_particle(neighbours);
+        current_particle.propogate();
+        current_particle.particle
     }
 }
-impl ParticleaAsPixel for ParticleBasic {
-    fn pixel_position(&self) -> Vec2 {
-        vec2(
-            self.scale(self.position.x, neighbours::GRID_WIDTH),
-            self.scale(self.position.y, neighbours::GRID_HEIGHT),
-        )
-    }
-}
-
-pub type Particles = [ParticleBasic; world::NUM_PARTICLES];
 
 #[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
 pub struct CurrentParticle {
@@ -149,12 +113,11 @@ pub struct CurrentParticle {
 
 impl CurrentParticle {
     pub fn new(
-        id: ParticleID,
-        particle_basic: ParticleBasic,
+        particle: Particle,
         neighbours: neighbours::NeighbouringParticles,
     ) -> CurrentParticle {
         CurrentParticle {
-            particle: Particle::new(id, particle_basic),
+            particle: Particle::new(particle),
             neighbours,
         }
     }

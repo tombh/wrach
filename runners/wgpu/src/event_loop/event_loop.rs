@@ -275,7 +275,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         let mut cpass =
             command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
         let index = self.bind_group_index_toggled();
-        let bind_groups = &self.manager.pipeline.particle_bind_groups[index];
+        let bind_groups = &self.manager.pipeline.bind_groups[index];
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.pre_compute_pipeline);
         cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
@@ -285,7 +285,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         let mut cpass =
             command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
         let index = self.bind_group_index_toggled();
-        let bind_groups = &self.manager.pipeline.particle_bind_groups[index];
+        let bind_groups = &self.manager.pipeline.bind_groups[index];
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.compute_pipeline);
 
@@ -297,7 +297,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         let mut cpass =
             command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
         let index = self.bind_group_index_toggled();
-        let bind_groups = &self.manager.pipeline.particle_bind_groups[index];
+        let bind_groups = &self.manager.pipeline.bind_groups[index];
         cpass.set_bind_group(0, bind_groups, &[]);
         cpass.set_pipeline(&self.manager.pipeline.post_compute_pipeline);
 

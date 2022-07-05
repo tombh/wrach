@@ -34,13 +34,18 @@ impl<'a> Builder<'a> {
     }
 
     pub fn compute_bind_group_layout(&mut self) -> wgpu::BindGroupLayout {
-        let sizeof_particle = std::mem::size_of::<physics::particle::Std140ParticleBasic>();
-        let sizeof_particles = (sizeof_particle * physics::world::NUM_PARTICLES as usize) as u64;
         let sizeof_params = std::mem::size_of::<physics::compute::Params>() as u64;
+        let sizeof_vec2 = std::mem::size_of::<physics::wrach_glam::glam::Vec2>();
+        let sizeof_vec2s = (sizeof_vec2 * physics::world::NUM_PARTICLES as usize) as u64;
+        let sizeof_propogation =
+            std::mem::size_of::<physics::particle::Std140ParticlePropogation>();
+        let sizeof_propogations =
+            (sizeof_propogation * physics::world::NUM_PARTICLES as usize) as u64;
         let neighbourhood_ids_size = (std::mem::size_of::<physics::neighbours::NeighbourhoodIDs>()
             * physics::world::NUM_PARTICLES) as u64;
 
         let bind_groups = [
+            // Params
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::COMPUTE,
@@ -51,6 +56,7 @@ impl<'a> Builder<'a> {
                 },
                 count: None,
             },
+            // Positions source
             wgpu::BindGroupLayoutEntry {
                 binding: 1,
                 visibility: wgpu::ShaderStages::COMPUTE,
@@ -61,22 +67,57 @@ impl<'a> Builder<'a> {
                     // storage class Storage { access: LOAD } doesn't match the shader Storage { access: LOAD | STORE }
                     ty: wgpu::BufferBindingType::Storage { read_only: false },
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(sizeof_particles),
+                    min_binding_size: wgpu::BufferSize::new(sizeof_vec2s),
                 },
                 count: None,
             },
+            // Positions destination
             wgpu::BindGroupLayoutEntry {
                 binding: 2,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: false },
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(sizeof_particles),
+                    min_binding_size: wgpu::BufferSize::new(sizeof_vec2s),
                 },
                 count: None,
             },
+            // Velocities source
             wgpu::BindGroupLayoutEntry {
                 binding: 3,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(sizeof_vec2s),
+                },
+                count: None,
+            },
+            // Velocities destination
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(sizeof_vec2s),
+                },
+                count: None,
+            },
+            // Propogations
+            wgpu::BindGroupLayoutEntry {
+                binding: 5,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(sizeof_propogations),
+                },
+                count: None,
+            },
+            // Pixel grid map
+            wgpu::BindGroupLayoutEntry {
+                binding: 6,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -87,8 +128,9 @@ impl<'a> Builder<'a> {
                 },
                 count: None,
             },
+            // Neighbourhood IDs
             wgpu::BindGroupLayoutEntry {
-                binding: 4,
+                binding: 7,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -107,8 +149,14 @@ impl<'a> Builder<'a> {
         self.device.create_bind_group_layout(&bind_group_layout)
     }
 
-    pub fn init_particle_buffer(&mut self) -> Vec<physics::particle::Std140ParticleBasic> {
-        let mut initial_particle_data: Vec<physics::particle::Std140ParticleBasic> = Vec::new();
+    pub fn init_particle_buffer(
+        &mut self,
+    ) -> (
+        Vec<physics::particle::ParticlePosition>,
+        Vec<physics::particle::ParticleVelocity>,
+    ) {
+        let mut initial_position_data: Vec<physics::particle::ParticlePosition> = Vec::new();
+        let mut initial_velocity_data: Vec<physics::particle::ParticleVelocity> = Vec::new();
         let mut count = 0;
         let x_min = -0.0;
         let mut x = x_min;
@@ -121,17 +169,11 @@ impl<'a> Builder<'a> {
 
         loop {
             loop {
-                let position = vec2(x, y); // * (1.0 + rng.gen_range(-jitter, jitter));
-                let particle = physics::particle::ParticleBasic {
-                    position,
-                    previous: position,
-                    velocity: vec2(
-                        rng.gen_range(-jitter, jitter),
-                        rng.gen_range(-jitter, jitter),
-                    ),
-                    ..Default::default()
-                };
-                initial_particle_data.push(particle.as_std140());
+                initial_position_data.push(vec2(x, y));
+                initial_velocity_data.push(vec2(
+                    rng.gen_range(-jitter, jitter),
+                    rng.gen_range(-jitter, jitter),
+                ));
                 count += 1;
                 if count > physics::world::NUM_PARTICLES {
                     break;
@@ -147,6 +189,6 @@ impl<'a> Builder<'a> {
                 break;
             }
         }
-        initial_particle_data
+        (initial_position_data, initial_velocity_data)
     }
 }

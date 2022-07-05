@@ -23,8 +23,7 @@ impl SquareVertex {
                     push_constant_ranges: &[],
                 });
 
-        let particle_array_stride =
-            std::mem::size_of::<physics::particle::Std140ParticleBasic>() as u64;
+        let vec2_array_stride = std::mem::size_of::<physics::wrach_glam::glam::Vec2>() as u64;
 
         let fragment = wgpu::FragmentState {
             module: shader_module,
@@ -40,16 +39,16 @@ impl SquareVertex {
                 entry_point: "main_vs",
                 buffers: &[
                     wgpu::VertexBufferLayout {
-                        array_stride: particle_array_stride,
+                        array_stride: vec2_array_stride,
                         step_mode: wgpu::VertexStepMode::Instance,
                         attributes: &wgpu::vertex_attr_array![
-                            0 => Float32x2, 1 => Float32x2
+                            0 => Float32x2
                         ],
                     },
                     wgpu::VertexBufferLayout {
                         array_stride: 1 * 8,
                         step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![2 => Float32x2],
+                        attributes: &wgpu::vertex_attr_array![1 => Float32x2],
                     },
                 ],
             },
@@ -126,13 +125,13 @@ impl Renderer for SquareVertex {
         view: &'a wgpu::TextureView,
     ) {
         let index = event_loop.bind_group_index_toggled();
-        let particle_buffer = event_loop.manager.pipeline.particle_buffers[index].slice(..);
+        let positions_buffer = event_loop.manager.pipeline.position_buffers[index].slice(..);
 
         command_encoder.push_debug_group("render pixels");
         {
             let mut rpass = Self::init_render_pass(command_encoder, view);
             rpass.set_pipeline(&self.pipeline);
-            rpass.set_vertex_buffer(0, particle_buffer);
+            rpass.set_vertex_buffer(0, positions_buffer);
             rpass.set_vertex_buffer(1, self.vertices.slice(..));
             rpass.draw(0..6, 0..physics::world::NUM_PARTICLES as u32);
         }

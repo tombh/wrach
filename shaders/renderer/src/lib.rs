@@ -20,7 +20,6 @@ pub fn main_vs(
     #[spirv(vertex_index)] _vert_id: i32,
     #[spirv(position)] screen_position: &mut Vec4,
     particle_position: Vec2,
-    _particle_velocity: Vec2,
     vertex: Vec2,
     output: &mut Vec4,
 ) {

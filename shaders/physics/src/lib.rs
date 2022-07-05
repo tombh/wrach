@@ -21,18 +21,21 @@ use wrach_glam::glam::UVec3;
 #[rustfmt::skip]
 #[spirv(compute(threads(128)))]
 pub fn pre_main_cs(
-    #[spirv(global_invocation_id)] id: UVec3,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] _params: &compute::Params,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] _particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] _neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
+    #[spirv(global_invocation_id)] iduv: UVec3,
+    #[spirv(push_constant)] _params: &compute::Params,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] positions_src: &mut particle::ParticlePositions,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] _positions_dst: &mut particle::ParticlePositions,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] _velocities_src: &mut particle::ParticleVelocities,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] _velocities_dst: &mut particle::ParticleVelocities,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 5)] _propogations: &mut particle::ParticlePropogations,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 6)] map: &mut neighbours::PixelMapBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 7)] _neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
 ) {
-    let id = id.x as particle::ParticleID;
+    let id = iduv.x as particle::ParticleID;
     if id >= world::NUM_PARTICLES as u32 {
         return;
     }
-    neighbours::NeighbouringParticles::place_particle_in_pixel(id, particles_src, map);
+    neighbours::NeighbouringParticles::place_particle_in_pixel(id, positions_src, map);
 }
 
 #[rustfmt::skip]
@@ -40,10 +43,13 @@ pub fn pre_main_cs(
 pub fn main_cs(
     #[spirv(global_invocation_id)] iduv: UVec3,
     #[spirv(push_constant)] params: &compute::Params,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] positions_src: &mut particle::ParticlePositions,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] positions_dst: &mut particle::ParticlePositions,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] velocities_src: &mut particle::ParticleVelocities,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] velocities_dst: &mut particle::ParticleVelocities,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 5)] propogations: &mut particle::ParticlePropogations,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 6)] map: &mut neighbours::PixelMapBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 7)] neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
 ) {
     let id = iduv.x as particle::ParticleID;
     if id >= world::NUM_PARTICLES as u32 {
@@ -52,10 +58,21 @@ pub fn main_cs(
     neighbours::NeighbouringParticles::find(
         id as particle::ParticleID,
         map,
-        particles_src,
+        positions_src,
         neighbourhood_ids,
     );
-    compute::entry(iduv, params, particles_src, particles_dst, map, neighbourhood_ids, 0);
+    compute::entry(
+        iduv,
+        params,
+        positions_src,
+        positions_dst,
+        velocities_src,
+        velocities_dst,
+        propogations,
+        map,
+        neighbourhood_ids,
+        0
+    );
 }
 
 #[rustfmt::skip]
@@ -63,16 +80,37 @@ pub fn main_cs(
 pub fn post_main_cs(
     #[spirv(global_invocation_id)] iduv: UVec3,
     #[spirv(push_constant)] params: &compute::Params,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] particles_src: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] particles_dst: &mut particle::Particles,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] map: &mut neighbours::PixelMapBasic,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] positions_src: &mut particle::ParticlePositions,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] positions_dst: &mut particle::ParticlePositions,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] velocities_src: &mut particle::ParticleVelocities,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] velocities_dst: &mut particle::ParticleVelocities,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 5)] propogations: &mut particle::ParticlePropogations,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 6)] map: &mut neighbours::PixelMapBasic,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 7)] neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
 ) {
     let id = iduv.x as particle::ParticleID;
     if id >= world::NUM_PARTICLES as u32 {
         return;
     }
-    compute::entry(iduv, params, particles_src, particles_dst, map, neighbourhood_ids, 1);
+    neighbours::NeighbouringParticles::find(
+        id as particle::ParticleID,
+        map,
+        positions_src,
+        neighbourhood_ids,
+    );
+    compute::entry(
+        iduv,
+        params,
+        positions_src,
+        positions_dst,
+        velocities_src,
+        velocities_dst,
+        propogations,
+        map,
+        neighbourhood_ids,
+        1
+    );
+
     if id == 450 {
         // let mut neighbours =
         // neighbours::NeighbouringParticles::recruit(
@@ -89,19 +127,19 @@ pub fn post_main_cs(
 
         let delta = 0.03;
         if params.up > 0 {
-            particles_dst[id as usize].velocity.y += delta;
+            velocities_dst[id as usize].y += delta;
         }
 
         if params.down > 0 {
-            particles_dst[id as usize].velocity.y -= delta;
+            velocities_dst[id as usize].y -= delta;
         }
 
         if params.left > 0 {
-            particles_dst[id as usize].velocity.x -= delta;
+            velocities_dst[id as usize].x -= delta;
         }
 
         if params.right > 0 {
-            particles_dst[id as usize].velocity.x += delta;
+            velocities_dst[id as usize].x += delta;
         }
 
     }

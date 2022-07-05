@@ -16,8 +16,9 @@
 #[cfg(target_arch = "spirv")]
 use spirv_std::num_traits::Float;
 
+use crate::wrach_glam::glam::{vec2, Vec2};
+
 use crate::particle;
-use crate::particle::ParticleaAsPixel;
 use crate::world;
 
 pub const MAX_NEIGHBOURS: usize = 9;
@@ -52,10 +53,10 @@ pub struct NeighbouringParticles {
 impl NeighbouringParticles {
     pub fn place_particle_in_pixel(
         id: particle::ParticleID,
-        particles: &mut particle::Particles,
+        positions: &particle::ParticlePositions,
         map: &mut PixelMapBasic,
     ) {
-        let pixel_position = particles[id as usize].pixel_position();
+        let pixel_position = positions[id as usize].pixel_position();
         // Remember that pixels are first class citizens and function as grids in themselves
         let coord = Self::linear_pixel_coord(
             pixel_position.x.floor() as u32,
@@ -69,27 +70,44 @@ impl NeighbouringParticles {
     pub fn find(
         id: u32,
         map: &PixelMapBasic,
-        particles: &mut particle::Particles,
+        positions: &particle::ParticlePositions,
         neighbourhood_ids_buffer: &mut NeighbourhoodIDsBuffer,
     ) {
-        let central_particle = particle::Particle::new(id, particles[id as usize]);
+        let particle = particle::Particle::new(particle::Particle {
+            id,
+            position: positions[id as usize],
+            ..Default::default()
+        });
+        let central_particle = particle::Particle::new(particle);
         let mut neighbouring = NeighbouringParticles::new(central_particle);
-        neighbouring.search_area_of_influence(map, particles);
+        neighbouring.search_area_of_influence(map, positions);
         neighbouring.neighbourhood_ids[0] = neighbouring.count as u32;
         neighbourhood_ids_buffer[id as usize] = neighbouring.neighbourhood_ids;
     }
 
     pub fn recruit(
         id: u32,
-        particles: &mut particle::Particles,
+        positions: &particle::ParticlePositions,
+        velocities: &particle::ParticleVelocities,
+        propogations: &particle::ParticlePropogations,
         neighbourhood_ids_buffer: &NeighbourhoodIDsBuffer,
     ) -> NeighbouringParticles {
-        let central_particle = particle::Particle::new(id, particles[id as usize]);
+        let central_particle = particle::Particle::new(particle::Particle {
+            id,
+            position: positions[id as usize],
+            ..Default::default()
+        });
         let mut neighbouring = NeighbouringParticles::new(central_particle);
         let neighbourhood_ids = neighbourhood_ids_buffer[id as usize];
         neighbouring.count = neighbourhood_ids[0] as usize;
         for i in 1..MAX_NEIGHBOURS_WITH_COUNT {
-            neighbouring.recruit_neighbour(i - 1, particles, neighbourhood_ids[i]);
+            neighbouring.recruit_neighbour(
+                i - 1,
+                positions,
+                velocities,
+                propogations,
+                neighbourhood_ids[i],
+            );
         }
         return neighbouring;
     }
@@ -107,17 +125,17 @@ impl NeighbouringParticles {
     fn search_area_of_influence(
         &mut self,
         map: &PixelMapBasic,
-        particles: &mut particle::Particles,
+        positions: &particle::ParticlePositions,
     ) {
         self.count = 0;
-        let (x_min, x_max) = Self::range(self.particle.pixel_position().x, GRID_WIDTH);
-        let (y_min, y_max) = Self::range(self.particle.pixel_position().y, GRID_HEIGHT);
+        let (x_min, x_max) = Self::range(self.particle.position.pixel_position().x, GRID_WIDTH);
+        let (y_min, y_max) = Self::range(self.particle.position.pixel_position().y, GRID_HEIGHT);
         for y in y_min..(y_max + 1) {
             for x in x_min..(x_max + 1) {
                 if self.count > MAX_NEIGHBOURS as usize {
                     return;
                 }
-                self.check_pixel(x, y, map, particles);
+                self.check_pixel(x, y, map, positions);
             }
         }
     }
@@ -137,7 +155,7 @@ impl NeighbouringParticles {
         x: u32,
         y: u32,
         map: &PixelMapBasic,
-        particles: &mut particle::Particles,
+        positions: &particle::ParticlePositions,
     ) {
         let coord = Self::linear_pixel_coord(x, y);
         let mut neighbour_id = map[coord];
@@ -150,9 +168,8 @@ impl NeighbouringParticles {
 
         neighbour_id -= 1;
 
-        let particle = particles[neighbour_id as usize];
-        let neighbour = particle::Particle::new(neighbour_id, particle);
-        let length = neighbour.position.distance(self.particle.position);
+        let position = positions[neighbour_id as usize];
+        let length = position.distance(self.particle.position);
         if length < (particle::INFLUENCE_FACTOR as f32 * particle::PARTICLE_RADIUS) {
             self.note_neighbour_id(neighbour_id);
         };
@@ -167,10 +184,19 @@ impl NeighbouringParticles {
     fn recruit_neighbour(
         &mut self,
         index: usize,
-        particles: &mut particle::Particles,
+        positions: &particle::ParticlePositions,
+        velocities: &particle::ParticleVelocities,
+        propogations: &particle::ParticlePropogations,
         neighbour_id: u32,
     ) {
-        let particle = particle::Particle::new(neighbour_id, particles[neighbour_id as usize]);
+        let particle = particle::Particle::new(particle::Particle {
+            id: neighbour_id,
+            previous: propogations[neighbour_id as usize].previous,
+            position: positions[neighbour_id as usize],
+            velocity: velocities[neighbour_id as usize],
+            lambda: propogations[neighbour_id as usize].lambda,
+            ..Default::default()
+        });
         self.neighbourhood[index] = particle;
     }
 
@@ -180,6 +206,23 @@ impl NeighbouringParticles {
 
     pub fn length(&self) -> u32 {
         self.count as u32
+    }
+}
+
+pub trait PositionAsPixel {
+    fn pixel_position(&self) -> Vec2;
+    fn scale(&self, position: f32, scale: u32) -> f32;
+}
+
+impl PositionAsPixel for Vec2 {
+    fn pixel_position(&self) -> Vec2 {
+        vec2(
+            self.scale(self.x, GRID_WIDTH),
+            self.scale(self.y, GRID_HEIGHT),
+        )
+    }
+    fn scale(&self, position: f32, scale: u32) -> f32 {
+        ((position + 1.0) / 2.0) * (scale - 1) as f32
     }
 }
 
@@ -194,49 +237,50 @@ mod tests {
 
     const O: u32 = 1;
 
-    fn make_particle(x: f32, y: f32) -> particle::ParticleBasic {
-        particle::ParticleBasic {
-            position: vec2(x, y),
-            ..Default::default()
-        }
+    fn make_position(x: f32, y: f32) -> particle::ParticlePosition {
+        vec2(x, y)
     }
 
-    fn setup() -> (PixelMapBasic, NeighbourhoodIDsBuffer, particle::Particles) {
+    fn setup() -> (
+        PixelMapBasic,
+        NeighbourhoodIDsBuffer,
+        particle::ParticlePositions,
+    ) {
         let map: PixelMapBasic = Default::default();
         let neighbourhood_ids_buffer: NeighbourhoodIDsBuffer = Default::default();
-        let mut particles: particle::Particles =
-            [particle::ParticleBasic::default(); world::NUM_PARTICLES];
-        particles[0] = make_particle(0.2, -0.2);
-        particles[1] = make_particle(0.001, 0.001);
-        particles[2] = make_particle(-0.2, 0.2);
-        particles[3] = make_particle(1.0, 1.0);
-        (map, neighbourhood_ids_buffer, particles)
+        let mut positions: particle::ParticlePositions =
+            [particle::ParticlePosition::default(); world::NUM_PARTICLES];
+        positions[0] = make_position(0.2, -0.2);
+        positions[1] = make_position(0.001, 0.001);
+        positions[2] = make_position(-0.2, 0.2);
+        positions[3] = make_position(1.0, 1.0);
+        (map, neighbourhood_ids_buffer, positions)
     }
 
     fn pixelize(
         map: &mut PixelMapBasic,
-        particles: &mut particle::Particles,
+        positions: &particle::ParticlePositions,
         neighbourhood_ids_buffer: &mut NeighbourhoodIDsBuffer,
     ) {
         for i in 0..world::NUM_PARTICLES {
             NeighbouringParticles::place_particle_in_pixel(
                 i as particle::ParticleID,
-                particles,
+                positions,
                 map,
             );
         }
         for i in 0..world::NUM_PARTICLES {
-            NeighbouringParticles::find(i as u32, map, particles, neighbourhood_ids_buffer);
+            NeighbouringParticles::find(i as u32, map, positions, neighbourhood_ids_buffer);
         }
     }
 
     #[test]
     fn it_converts_coords() {
-        let bp = make_particle(0.0, 0.0);
+        let bp = make_position(0.0, 0.0);
         assert_eq!(bp.pixel_position(), vec2(1.0, 1.0));
-        let bp = make_particle(-1.0, -1.0);
+        let bp = make_position(-1.0, -1.0);
         assert_eq!(bp.pixel_position(), vec2(0.0, 0.0));
-        let bp = make_particle(1.0, 1.0);
+        let bp = make_position(1.0, 1.0);
         assert_eq!(bp.pixel_position(), vec2(2.0, 2.0));
     }
 
@@ -254,10 +298,17 @@ mod tests {
 
     #[test]
     fn it_finds_particles_around_the_centre() {
-        let (mut map, mut neighbourhood_ids_buffer, mut particles) = setup();
-        pixelize(&mut map, &mut particles, &mut neighbourhood_ids_buffer);
-        let mut neighbours =
-            NeighbouringParticles::recruit(1, &mut particles, &mut neighbourhood_ids_buffer);
+        let (mut map, mut neighbourhood_ids_buffer, positions) = setup();
+        pixelize(&mut map, &positions, &mut neighbourhood_ids_buffer);
+        let velocities = [vec2(0.0, 0.0); world::NUM_PARTICLES];
+        let propogations = [particle::ParticlePropogation::default(); world::NUM_PARTICLES];
+        let mut neighbours = NeighbouringParticles::recruit(
+            1,
+            &positions,
+            &velocities,
+            &propogations,
+            &neighbourhood_ids_buffer,
+        );
         assert_eq!(neighbours.length(), 3);
         for i in 0..MAX_NEIGHBOURS {
             println!("{}", neighbours.get_neighbour(i as u32).id);
@@ -270,10 +321,17 @@ mod tests {
 
     #[test]
     fn it_finds_particles_around_the_bottom_left() {
-        let (mut map, mut neighbourhood_ids_buffer, mut particles) = setup();
-        pixelize(&mut map, &mut particles, &mut neighbourhood_ids_buffer);
-        let mut neighbours =
-            NeighbouringParticles::recruit(3, &mut particles, &mut neighbourhood_ids_buffer);
+        let (mut map, mut neighbourhood_ids_buffer, positions) = setup();
+        pixelize(&mut map, &positions, &mut neighbourhood_ids_buffer);
+        let velocities = [vec2(0.0, 0.0); world::NUM_PARTICLES];
+        let propogations = [particle::ParticlePropogation::default(); world::NUM_PARTICLES];
+        let mut neighbours = NeighbouringParticles::recruit(
+            3,
+            &positions,
+            &velocities,
+            &propogations,
+            &neighbourhood_ids_buffer,
+        );
         assert_eq!(neighbours.length(), 1);
         assert_eq!(neighbours.get_neighbour(0).id, 3);
         assert_eq!(neighbours.get_neighbour(1).id, 0);

@@ -1,8 +1,6 @@
 #[cfg(not(target_arch = "spirv"))]
 use crevice::std140::AsStd140;
 
-use crate::particle::Particle;
-use crate::particle::ParticleBasic;
 use crate::wrach_glam::glam::UVec3;
 
 use crate::neighbours;
@@ -28,8 +26,11 @@ pub struct Params {
 pub fn entry(
     id: UVec3,
     _params: &Params,
-    particles_src: &mut particle::Particles,
-    particles_dst: &mut particle::Particles,
+    positions_src: &mut particle::ParticlePositions,
+    positions_dst: &mut particle::ParticlePositions,
+    velocities_src: &mut particle::ParticleVelocities,
+    velocities_dst: &mut particle::ParticleVelocities,
+    propogations: &mut particle::ParticlePropogations,
     _grid: &neighbours::PixelMapBasic,
     neighbourhood_ids_buffer: &neighbours::NeighbourhoodIDsBuffer,
     stage: u32,
@@ -40,22 +41,49 @@ pub fn entry(
     }
     let neighbours = neighbours::NeighbouringParticles::recruit(
         id as particle::ParticleID,
-        particles_src,
+        positions_src,
+        velocities_src,
+        propogations,
         neighbourhood_ids_buffer,
     );
-    let particle = match stage {
-        0 => particles_src[id].compute(id as particle::ParticleID, neighbours),
-        1 => particles_src[id].propogate(id as particle::ParticleID, neighbours),
-        _ => Particle::default(),
-    };
 
-    let particle_basic = ParticleBasic {
-        lambda: particle.lambda,
-        position: particle.position,
-        previous: particle.previous,
-        velocity: particle.velocity,
-    };
+    let mut particle = particle::Particle::default();
 
-    // TODO: shouldn't this be handled in the methods above?
-    particles_dst[id] = particle_basic;
+    match stage {
+        // Reads: 2xVec2
+        // Writes: 3xVec2, 1xf32
+        0 => {
+            particle = particle::Particle::new(particle::Particle {
+                id: id as u32,
+                position: positions_src[id],
+                velocity: velocities_src[id],
+                ..Default::default()
+            });
+            particle = particle.compute(neighbours);
+            positions_dst[id] = particle.position;
+            velocities_dst[id] = particle.velocity;
+            propogations[id] = particle::ParticlePropogation {
+                previous: particle.previous,
+                lambda: particle.lambda,
+            }
+        }
+
+        // Reads: 2xVec2, 1xf32
+        // Writes: 2xVec2
+        1 => {
+            let propogation = propogations[id];
+            particle = particle::Particle::new(particle::Particle {
+                id: id as u32,
+                velocity: velocities_src[id],
+                previous: propogation.previous,
+                lambda: propogation.lambda,
+                ..Default::default()
+            });
+            particle = particle.propogate(neighbours);
+            positions_dst[id] = particle.position;
+            velocities_dst[id] = particle.velocity;
+        }
+
+        _ => drop(particle),
+    }
 }
