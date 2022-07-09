@@ -11,6 +11,8 @@ pub fn build(path_to_create: &str) -> Vec<u8> {
         // Is it something to do with wgpu?
         // ---
         // .extension("SPV_KHR_non_semantic_info")
+        // .extension("SPV_KHR_16bit_storage")
+        // .capability(spirv_builder::Capability::Int16)
         .build()
         .unwrap();
     let module_path = compile_result.module.unwrap_single();

@@ -24,7 +24,7 @@ use crate::world;
 pub const MAX_NEIGHBOURS: usize = 9;
 pub const MAX_NEIGHBOURS_WITH_COUNT: usize = MAX_NEIGHBOURS + 1;
 type Neighbourhood = [particle::Particle; MAX_NEIGHBOURS_WITH_COUNT];
-pub type NeighbourhoodIDs = [u32; MAX_NEIGHBOURS + 1];
+pub type NeighbourhoodIDs = [particle::ParticleID; MAX_NEIGHBOURS + 1];
 pub type NeighbourhoodIDsBuffer = [NeighbourhoodIDs; world::NUM_PARTICLES];
 
 cfg_if::cfg_if! {
@@ -39,7 +39,7 @@ pub const GRID_HEIGHT: u32 = world::MAP_HEIGHT * GRID_RESOLUTION;
 pub const GRID_SIZE: usize = (GRID_WIDTH * GRID_HEIGHT) as usize;
 pub type PixelMapBasic = [particle::ParticleID; GRID_SIZE];
 
-const NO_PARTICLE_ID: u32 = 0;
+const NO_PARTICLE_ID: particle::ParticleID = 0;
 
 #[cfg_attr(not(target_arch = "spirv"), derive(Debug))]
 #[derive(Default, Copy, Clone)]
@@ -53,10 +53,10 @@ pub struct NeighbouringParticles {
 impl NeighbouringParticles {
     pub fn place_particle_in_pixel(
         id: particle::ParticleID,
-        positions: &particle::ParticlePositions,
+        position: particle::ParticlePosition,
         map: &mut PixelMapBasic,
     ) {
-        let pixel_position = positions[id as usize].pixel_position();
+        let pixel_position = position.pixel_position();
         // Remember that pixels are first class citizens and function as grids in themselves
         let coord = Self::linear_pixel_coord(
             pixel_position.x.floor() as u32,
@@ -68,11 +68,11 @@ impl NeighbouringParticles {
     }
 
     pub fn find(
-        id: u32,
+        id: particle::ParticleID,
         map: &PixelMapBasic,
         positions: &particle::ParticlePositions,
         neighbourhood_ids_buffer: &mut NeighbourhoodIDsBuffer,
-    ) {
+    ) -> NeighbourhoodIDs {
         let particle = particle::Particle::new(particle::Particle {
             id,
             position: positions[id as usize],
@@ -81,16 +81,18 @@ impl NeighbouringParticles {
         let central_particle = particle::Particle::new(particle);
         let mut neighbouring = NeighbouringParticles::new(central_particle);
         neighbouring.search_area_of_influence(map, positions);
-        neighbouring.neighbourhood_ids[0] = neighbouring.count as u32;
+        neighbouring.neighbourhood_ids[0] = neighbouring.count as particle::ParticleID;
         neighbourhood_ids_buffer[id as usize] = neighbouring.neighbourhood_ids;
+        neighbouring.neighbourhood_ids
     }
 
-    pub fn recruit(
-        id: u32,
+    pub fn recruit_from_global(
+        id: particle::ParticleID,
         positions: &particle::ParticlePositions,
         velocities: &particle::ParticleVelocities,
         propogations: &particle::ParticlePropogations,
         neighbourhood_ids_buffer: &NeighbourhoodIDsBuffer,
+        stage: u32,
     ) -> NeighbouringParticles {
         let central_particle = particle::Particle::new(particle::Particle {
             id,
@@ -100,13 +102,42 @@ impl NeighbouringParticles {
         let mut neighbouring = NeighbouringParticles::new(central_particle);
         let neighbourhood_ids = neighbourhood_ids_buffer[id as usize];
         neighbouring.count = neighbourhood_ids[0] as usize;
-        for i in 1..MAX_NEIGHBOURS_WITH_COUNT {
+        for i in 1..=neighbouring.count {
             neighbouring.recruit_neighbour(
                 i - 1,
                 positions,
                 velocities,
                 propogations,
                 neighbourhood_ids[i],
+                stage,
+            );
+        }
+        return neighbouring;
+    }
+
+    pub fn recruit_from_ids(
+        id: particle::ParticleID,
+        positions: &particle::ParticlePositions,
+        velocities: &particle::ParticleVelocities,
+        propogations: &particle::ParticlePropogations,
+        neighbourhood_ids: NeighbourhoodIDs,
+        stage: u32,
+    ) -> NeighbouringParticles {
+        let central_particle = particle::Particle::new(particle::Particle {
+            id,
+            position: positions[id as usize],
+            ..Default::default()
+        });
+        let mut neighbouring = NeighbouringParticles::new(central_particle);
+        neighbouring.count = neighbourhood_ids[0] as usize;
+        for i in 1..=neighbouring.count {
+            neighbouring.recruit_neighbour(
+                i - 1,
+                positions,
+                velocities,
+                propogations,
+                neighbourhood_ids[i],
+                stage,
             );
         }
         return neighbouring;
@@ -175,7 +206,7 @@ impl NeighbouringParticles {
         };
     }
 
-    fn note_neighbour_id(&mut self, neighbour_id: u32) {
+    fn note_neighbour_id(&mut self, neighbour_id: particle::ParticleID) {
         let index_offset = self.count + 1;
         self.neighbourhood_ids[index_offset] = neighbour_id;
         self.count += 1;
@@ -187,16 +218,26 @@ impl NeighbouringParticles {
         positions: &particle::ParticlePositions,
         velocities: &particle::ParticleVelocities,
         propogations: &particle::ParticlePropogations,
-        neighbour_id: u32,
+        neighbour_id: particle::ParticleID,
+        stage: u32,
     ) {
-        let particle = particle::Particle::new(particle::Particle {
-            id: neighbour_id,
-            previous: propogations[neighbour_id as usize].previous,
-            position: positions[neighbour_id as usize],
-            velocity: velocities[neighbour_id as usize],
-            lambda: propogations[neighbour_id as usize].lambda,
-            ..Default::default()
-        });
+        let particle = match stage {
+            0 => particle::Particle::new(particle::Particle {
+                id: neighbour_id,
+                position: positions[neighbour_id as usize],
+                velocity: velocities[neighbour_id as usize],
+                ..Default::default()
+            }),
+            1 => particle::Particle::new(particle::Particle {
+                id: neighbour_id,
+                previous: propogations[neighbour_id as usize].previous,
+                position: positions[neighbour_id as usize],
+                velocity: velocities[neighbour_id as usize],
+                lambda: propogations[neighbour_id as usize].lambda,
+                ..Default::default()
+            }),
+            _ => particle::Particle::default(),
+        };
         self.neighbourhood[index] = particle;
     }
 
@@ -235,7 +276,7 @@ mod tests {
     use glam::vec2;
     use world;
 
-    const O: u32 = 1;
+    const O: particle::ParticleID = 1;
 
     fn make_position(x: f32, y: f32) -> particle::ParticlePosition {
         vec2(x, y)
@@ -265,12 +306,17 @@ mod tests {
         for i in 0..world::NUM_PARTICLES {
             NeighbouringParticles::place_particle_in_pixel(
                 i as particle::ParticleID,
-                positions,
+                positions[i],
                 map,
             );
         }
         for i in 0..world::NUM_PARTICLES {
-            NeighbouringParticles::find(i as u32, map, positions, neighbourhood_ids_buffer);
+            NeighbouringParticles::find(
+                i as particle::ParticleID,
+                map,
+                positions,
+                neighbourhood_ids_buffer,
+            );
         }
     }
 
@@ -302,12 +348,13 @@ mod tests {
         pixelize(&mut map, &positions, &mut neighbourhood_ids_buffer);
         let velocities = [vec2(0.0, 0.0); world::NUM_PARTICLES];
         let propogations = [particle::ParticlePropogation::default(); world::NUM_PARTICLES];
-        let mut neighbours = NeighbouringParticles::recruit(
+        let mut neighbours = NeighbouringParticles::recruit_from_global(
             1,
             &positions,
             &velocities,
             &propogations,
             &neighbourhood_ids_buffer,
+            0,
         );
         assert_eq!(neighbours.length(), 3);
         for i in 0..MAX_NEIGHBOURS {
@@ -325,12 +372,13 @@ mod tests {
         pixelize(&mut map, &positions, &mut neighbourhood_ids_buffer);
         let velocities = [vec2(0.0, 0.0); world::NUM_PARTICLES];
         let propogations = [particle::ParticlePropogation::default(); world::NUM_PARTICLES];
-        let mut neighbours = NeighbouringParticles::recruit(
+        let mut neighbours = NeighbouringParticles::recruit_from_global(
             3,
             &positions,
             &velocities,
             &propogations,
             &neighbourhood_ids_buffer,
+            0,
         );
         assert_eq!(neighbours.length(), 1);
         assert_eq!(neighbours.get_neighbour(0).id, 3);

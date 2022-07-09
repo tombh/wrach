@@ -129,7 +129,7 @@ impl CurrentParticle {
     // reach here, but, well it does, and I have absolutely no idea why, it's soo
     // wrong 😭
     fn is_id_unsafe_hack(&self) -> bool {
-        self.particle.id >= world::NUM_PARTICLES as u32
+        self.particle.id >= world::NUM_PARTICLES as ParticleID
     }
 
     pub fn compute(&mut self) {

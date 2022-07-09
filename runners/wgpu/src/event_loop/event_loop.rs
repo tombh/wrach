@@ -258,27 +258,15 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
     }
 
     fn compute_pass(&mut self, command_encoder: &mut wgpu::CommandEncoder) {
-        command_encoder.clear_buffer(&self.manager.pipeline.grid_buffer, 0, None);
-        self.pre_compute_pass(command_encoder);
-
         command_encoder.push_debug_group("compute");
         {
             for _ in 0..physics::particle::DEFAULT_NUM_SOLVER_SUBSTEPS {
                 self.compute_pass_stage(command_encoder);
+                command_encoder.clear_buffer(&self.manager.pipeline.grid_buffer, 0, None);
                 self.post_compute_pass_stage(command_encoder);
             }
         }
         command_encoder.pop_debug_group();
-    }
-
-    fn pre_compute_pass(&mut self, command_encoder: &mut wgpu::CommandEncoder) {
-        let mut cpass =
-            command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
-        let index = self.bind_group_index_toggled();
-        let bind_groups = &self.manager.pipeline.bind_groups[index];
-        cpass.set_bind_group(0, bind_groups, &[]);
-        cpass.set_pipeline(&self.manager.pipeline.pre_compute_pipeline);
-        cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
     }
 
     fn compute_pass_stage(&mut self, command_encoder: &mut wgpu::CommandEncoder) {

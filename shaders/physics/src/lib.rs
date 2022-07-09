@@ -20,26 +20,6 @@ use wrach_glam::glam::UVec3;
 
 #[rustfmt::skip]
 #[spirv(compute(threads(128)))]
-pub fn pre_main_cs(
-    #[spirv(global_invocation_id)] iduv: UVec3,
-    #[spirv(push_constant)] _params: &compute::Params,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] positions_src: &mut particle::ParticlePositions,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] _positions_dst: &mut particle::ParticlePositions,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] _velocities_src: &mut particle::ParticleVelocities,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] _velocities_dst: &mut particle::ParticleVelocities,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 5)] _propogations: &mut particle::ParticlePropogations,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 6)] map: &mut neighbours::PixelMapBasic,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 7)] _neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
-) {
-    let id = iduv.x as particle::ParticleID;
-    if id >= world::NUM_PARTICLES as u32 {
-        return;
-    }
-    neighbours::NeighbouringParticles::place_particle_in_pixel(id, positions_src, map);
-}
-
-#[rustfmt::skip]
-#[spirv(compute(threads(128)))]
 pub fn main_cs(
     #[spirv(global_invocation_id)] iduv: UVec3,
     #[spirv(push_constant)] params: &compute::Params,
@@ -52,15 +32,9 @@ pub fn main_cs(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 7)] neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
 ) {
     let id = iduv.x as particle::ParticleID;
-    if id >= world::NUM_PARTICLES as u32 {
+    if id >= world::NUM_PARTICLES as particle::ParticleID {
         return;
     }
-    neighbours::NeighbouringParticles::find(
-        id as particle::ParticleID,
-        map,
-        positions_src,
-        neighbourhood_ids,
-    );
     compute::entry(
         iduv,
         params,
@@ -89,15 +63,9 @@ pub fn post_main_cs(
     #[spirv(storage_buffer, descriptor_set = 0, binding = 7)] neighbourhood_ids: &mut neighbours::NeighbourhoodIDsBuffer,
 ) {
     let id = iduv.x as particle::ParticleID;
-    if id >= world::NUM_PARTICLES as u32 {
+    if id >= world::NUM_PARTICLES as particle::ParticleID {
         return;
     }
-    neighbours::NeighbouringParticles::find(
-        id as particle::ParticleID,
-        map,
-        positions_src,
-        neighbourhood_ids,
-    );
     compute::entry(
         iduv,
         params,

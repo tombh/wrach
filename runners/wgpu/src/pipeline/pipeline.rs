@@ -18,7 +18,6 @@ pub struct Pipeline {
     pub propogations_buffer: wgpu::Buffer,
     pub params_buffer: wgpu::Buffer,
     pub grid_buffer: wgpu::Buffer,
-    pub pre_compute_pipeline: wgpu::ComputePipeline,
     pub compute_pipeline: wgpu::ComputePipeline,
     pub post_compute_pipeline: wgpu::ComputePipeline,
     pub work_group_count: u32,
@@ -44,14 +43,6 @@ impl Pipeline {
                 }],
             });
 
-        let pre_compute_pipeline =
-            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                label: Some("Pre-compute pipeline"),
-                layout: Some(&compute_pipeline_layout),
-                module: &shader_module,
-                entry_point: "pre_main_cs",
-            });
-
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Compute pipeline"),
             layout: Some(&compute_pipeline_layout),
@@ -67,7 +58,8 @@ impl Pipeline {
                 entry_point: "post_main_cs",
             });
 
-        let (initial_position_data, initial_velocity_data) = builder.init_particle_buffer();
+        let (initial_position_data, initial_velocity_data, initial_grid_data) =
+            builder.init_particle_buffer();
 
         let mut bind_groups = Vec::<wgpu::BindGroup>::new();
 
@@ -104,10 +96,9 @@ impl Pipeline {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
-        let grid: physics::neighbours::PixelMapBasic = [0; physics::neighbours::GRID_SIZE];
         let grid_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("Pixel Map")),
-            contents: bytemuck::cast_slice(&grid),
+            contents: bytemuck::cast_slice(&initial_grid_data),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -172,7 +163,6 @@ impl Pipeline {
             propogations_buffer,
             params_buffer,
             grid_buffer,
-            pre_compute_pipeline,
             compute_pipeline,
             post_compute_pipeline,
             work_group_count,

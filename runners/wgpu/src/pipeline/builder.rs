@@ -38,9 +38,8 @@ impl<'a> Builder<'a> {
         let sizeof_vec2 = std::mem::size_of::<physics::wrach_glam::glam::Vec2>();
         let sizeof_vec2s = (sizeof_vec2 * physics::world::NUM_PARTICLES as usize) as u64;
         let sizeof_propogation =
-            std::mem::size_of::<physics::particle::Std140ParticlePropogation>();
-        let sizeof_propogations =
-            (sizeof_propogation * physics::world::NUM_PARTICLES as usize) as u64;
+            std::mem::size_of::<physics::particle::Std140ParticlePropogation>() as u64;
+        let sizeof_propogations = sizeof_propogation * physics::world::NUM_PARTICLES as u64;
         let neighbourhood_ids_size = (std::mem::size_of::<physics::neighbours::NeighbourhoodIDs>()
             * physics::world::NUM_PARTICLES) as u64;
 
@@ -154,9 +153,12 @@ impl<'a> Builder<'a> {
     ) -> (
         Vec<physics::particle::ParticlePosition>,
         Vec<physics::particle::ParticleVelocity>,
+        physics::neighbours::PixelMapBasic,
     ) {
         let mut initial_position_data: Vec<physics::particle::ParticlePosition> = Vec::new();
         let mut initial_velocity_data: Vec<physics::particle::ParticleVelocity> = Vec::new();
+        let mut initial_grid_data: physics::neighbours::PixelMapBasic =
+            [0; physics::neighbours::GRID_SIZE];
         let mut count = 0;
         let x_min = -0.0;
         let mut x = x_min;
@@ -169,11 +171,17 @@ impl<'a> Builder<'a> {
 
         loop {
             loop {
-                initial_position_data.push(vec2(x, y));
+                let position = vec2(x, y);
+                initial_position_data.push(position);
                 initial_velocity_data.push(vec2(
                     rng.gen_range(-jitter, jitter),
                     rng.gen_range(-jitter, jitter),
                 ));
+                physics::neighbours::NeighbouringParticles::place_particle_in_pixel(
+                    count as physics::particle::ParticleID,
+                    position,
+                    &mut initial_grid_data,
+                );
                 count += 1;
                 if count > physics::world::NUM_PARTICLES {
                     break;
@@ -189,6 +197,10 @@ impl<'a> Builder<'a> {
                 break;
             }
         }
-        (initial_position_data, initial_velocity_data)
+        (
+            initial_position_data,
+            initial_velocity_data,
+            initial_grid_data,
+        )
     }
 }
