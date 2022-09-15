@@ -1,4 +1,4 @@
-use crate::pipeline::pipeline;
+use crate::pipeliner::pipeline;
 use winit;
 
 use wrach_physics_shaders as physics;

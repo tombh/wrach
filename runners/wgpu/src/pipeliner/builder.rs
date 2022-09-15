@@ -20,6 +20,14 @@ impl<'a> Builder<'a> {
             label: Some(path),
             source: spirv,
         })
+        // NOTE: You can avoid Wgpu's stricter parsing of the SPIRV binary with this:
+        // let spirv = wgpu::util::make_spirv_raw(&shader_binary);
+        // unsafe {
+        //     device.create_shader_module_spirv(&wgpu::ShaderModuleDescriptorSpirV {
+        //         label: Some(path),
+        //         source: spirv,
+        //     })
+        // }
     }
 
     pub fn params_buffer(&mut self, params: physics::compute::Params) -> wgpu::Buffer {

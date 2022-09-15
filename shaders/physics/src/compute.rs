@@ -23,6 +23,7 @@ pub struct Params {
 //     Propogate,
 // }
 
+#[allow(clippy::too_many_arguments)]
 pub fn entry(
     id: UVec3,
     _params: &Params,
@@ -114,6 +115,6 @@ pub fn entry(
             );
         }
 
-        _ => drop(particle),
+        _ => _ = particle,
     }
 }

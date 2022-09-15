@@ -6,6 +6,7 @@
 )]
 // HACK(eddyb) can't easily see warnings otherwise from `spirv-builder` builds.
 #![deny(warnings)]
+#![allow(clippy::needless_range_loop)]
 
 #[cfg(not(target_arch = "spirv"))]
 use spirv_std::macros::spirv;
@@ -18,6 +19,7 @@ pub mod wrach_glam;
 
 use wrach_glam::glam::UVec3;
 
+#[allow(clippy::too_many_arguments)]
 #[rustfmt::skip]
 #[spirv(compute(threads(128)))]
 pub fn main_cs(
@@ -49,6 +51,7 @@ pub fn main_cs(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 #[rustfmt::skip]
 #[spirv(compute(threads(128)))]
 pub fn post_main_cs(

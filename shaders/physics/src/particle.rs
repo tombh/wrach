@@ -73,11 +73,8 @@ impl Particle {
         particle
     }
 
-    fn to_current_particle(
-        &self,
-        neighbours: neighbours::NeighbouringParticles,
-    ) -> CurrentParticle {
-        CurrentParticle::new(*self, neighbours)
+    fn to_current_particle(self, neighbours: neighbours::NeighbouringParticles) -> CurrentParticle {
+        CurrentParticle::new(self, neighbours)
     }
 
     // TODO: explain

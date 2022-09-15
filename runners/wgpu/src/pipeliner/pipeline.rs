@@ -91,13 +91,13 @@ impl Pipeline {
         let propogations: Vec<physics::particle::Std140ParticlePropogation> =
             vec![propogation.as_std140(); physics::world::NUM_PARTICLES];
         let propogations_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Propogations buffer")),
+            label: Some("Propogations buffer"),
             contents: bytemuck::cast_slice(&propogations),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
         let grid_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("Pixel Map")),
+            label: Some("Pixel Map"),
             contents: bytemuck::cast_slice(&initial_grid_data),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
@@ -106,7 +106,7 @@ impl Pipeline {
             [[0; physics::neighbours::MAX_NEIGHBOURS_WITH_COUNT]; physics::world::NUM_PARTICLES];
         let neighbourhood_ids_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("Neighbourhood IDs")),
+                label: Some("Neighbourhood IDs"),
                 contents: bytemuck::cast_slice(&neighbourhood_ids),
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             });

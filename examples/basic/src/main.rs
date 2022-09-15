@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 use wrach_physics_shaders as physics;
-use wrach_wgpu::event_loop::event_loop::{EventLoop, Renderer};
-use wrach_wgpu::pipeline::builder::Builder;
+use wrach_wgpu::event_looper::event_loop::{EventLoop, Renderer};
+use wrach_wgpu::pipeliner::builder::Builder;
 use wrach_wgpu::{bytemuck, gpu_manager, wgpu};
 
 struct SquareVertex {
@@ -46,7 +46,7 @@ impl SquareVertex {
                         ],
                     },
                     wgpu::VertexBufferLayout {
-                        array_stride: 1 * 8,
+                        array_stride: 8,
                         step_mode: wgpu::VertexStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![1 => Float32x2],
                     },
@@ -74,9 +74,9 @@ impl SquareVertex {
         .map(|x| 0.5 * physics::particle::PIXEL_SIZE * (*x as f32))
         .collect();
         let mut square = [0.0; 12];
-        for i in 0..12 {
+        (0..12).for_each(|i| {
             square[i] = vertex_buffer_data[i];
-        }
+        });
         manager
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {

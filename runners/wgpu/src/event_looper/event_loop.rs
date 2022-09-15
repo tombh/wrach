@@ -106,7 +106,6 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
             event::Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
                     self.is_exit = true;
-                    return;
                 }
                 WindowEvent::KeyboardInput {
                     input:

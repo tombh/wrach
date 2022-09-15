@@ -13,3 +13,9 @@ impl<'a> Spawner<'a> {
         while self.executor.try_tick() {}
     }
 }
+
+impl Default for Spawner<'_> {
+    fn default() -> Self {
+        Spawner::new()
+    }
+}

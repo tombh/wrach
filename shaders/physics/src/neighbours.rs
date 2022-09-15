@@ -103,8 +103,7 @@ impl NeighbouringParticles {
         let neighbourhood_ids = neighbourhood_ids_buffer[id as usize];
         neighbouring.count = neighbourhood_ids[0] as usize;
         for i in 1..=neighbouring.count {
-            neighbouring.recruit_neighbour(
-                i - 1,
+            neighbouring.neighbourhood[i - 1] = neighbouring.recruit_neighbour(
                 positions,
                 velocities,
                 propogations,
@@ -112,7 +111,7 @@ impl NeighbouringParticles {
                 stage,
             );
         }
-        return neighbouring;
+        neighbouring
     }
 
     pub fn recruit_from_ids(
@@ -131,8 +130,7 @@ impl NeighbouringParticles {
         let mut neighbouring = NeighbouringParticles::new(central_particle);
         neighbouring.count = neighbourhood_ids[0] as usize;
         for i in 1..=neighbouring.count {
-            neighbouring.recruit_neighbour(
-                i - 1,
+            neighbouring.neighbourhood[i - 1] = neighbouring.recruit_neighbour(
                 positions,
                 velocities,
                 propogations,
@@ -140,13 +138,14 @@ impl NeighbouringParticles {
                 stage,
             );
         }
-        return neighbouring;
+        neighbouring
     }
 
     fn new(particle: particle::Particle) -> NeighbouringParticles {
-        let mut neighbouring = NeighbouringParticles::default();
-        neighbouring.particle = particle;
-        return neighbouring;
+        NeighbouringParticles {
+            particle,
+            ..Default::default()
+        }
     }
 
     fn linear_pixel_coord(x: u32, y: u32) -> usize {
@@ -178,7 +177,7 @@ impl NeighbouringParticles {
         let mut max = floor + range;
         min = min.clamp(0.0, (scale - 1) as f32);
         max = max.clamp(0.0, (scale - 1) as f32);
-        return (min as u32, max as u32);
+        (min as u32, max as u32)
     }
 
     fn check_pixel(
@@ -214,14 +213,13 @@ impl NeighbouringParticles {
 
     fn recruit_neighbour(
         &mut self,
-        index: usize,
         positions: &particle::ParticlePositions,
         velocities: &particle::ParticleVelocities,
         propogations: &particle::ParticlePropogations,
         neighbour_id: particle::ParticleID,
         stage: u32,
-    ) {
-        let particle = match stage {
+    ) -> particle::Particle {
+        match stage {
             0 => particle::Particle::new(particle::Particle {
                 id: neighbour_id,
                 position: positions[neighbour_id as usize],
@@ -237,8 +235,7 @@ impl NeighbouringParticles {
                 ..Default::default()
             }),
             _ => particle::Particle::default(),
-        };
-        self.neighbourhood[index] = particle;
+        }
     }
 
     pub fn get_neighbour(&mut self, index: u32) -> particle::Particle {
@@ -332,11 +329,11 @@ mod tests {
 
     #[test]
     fn it_places_particles_in_map() {
-        let (mut map, mut neighbourhood_ids_buffer, mut particles) = setup();
-        pixelize(&mut map, &mut particles, &mut neighbourhood_ids_buffer);
+        let (mut map, mut neighbourhood_ids_buffer, particles) = setup();
+        pixelize(&mut map, &particles, &mut neighbourhood_ids_buffer);
         #[rustfmt::skip]
         assert_eq!(map, [
-            0,   0+O, 0,
+            0,   O, 0,
             2+O, 1+O, 0,
             0,   0,   3+O
         ]);
