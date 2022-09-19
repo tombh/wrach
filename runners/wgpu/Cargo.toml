@@ -8,12 +8,12 @@ edition = "2018"
 wrach-physics-shaders = { path = "../../shaders/physics" }
 rust-gpu-compiler = { path = "../../shaders/rust-gpu-compiler" }
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
-wgpu = { version = "0.11.0", features = ["spirv"] }
-wgpu-hal = "=0.11.2"
-winit = { version = "0.25", features = ["web-sys"] }
+wgpu = { version = "0.13.1", features = ["spirv", "vulkan-portability"] }
+wgpu-hal = "0.13.2"
+winit = { version = "0.27" }
 bytemuck = "1.7.2"
-crevice = { version = "0.8.0", features = ["glam"] }
-rand = "0.7.2"
+crevice = { version = "0.11.0", features = ["glam"] }
+rand = "0.8.5"
 cgmath = "0.18.0"
 env_logger = "0.9.0"
 async-executor = "1.4.1"

@@ -188,7 +188,11 @@ impl NeighbouringParticles {
         positions: &particle::ParticlePositions,
     ) {
         let coord = Self::linear_pixel_coord(x, y);
+
+        // -------------------------------
+        // EXPENSIVE MEMORY ACESS
         let mut neighbour_id = map[coord];
+        // -------------------------------
 
         // Subtract 1 as all the IDs have been incremented to accomodate particle::NO_PARTICLE_ID
         // TODO: can we use Option<T> instead of hacking ID 0?
@@ -198,7 +202,11 @@ impl NeighbouringParticles {
 
         neighbour_id -= 1;
 
+        // ---------------------------------------------
+        // EXPENSIVE MEMORY ACESS
         let position = positions[neighbour_id as usize];
+        // ---------------------------------------------
+
         let length = position.distance(self.particle.position);
         if length < (particle::INFLUENCE_FACTOR as f32 * particle::PARTICLE_RADIUS) {
             self.note_neighbour_id(neighbour_id);

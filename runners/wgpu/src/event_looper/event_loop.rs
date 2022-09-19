@@ -277,7 +277,7 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         cpass.set_pipeline(&self.manager.pipeline.compute_pipeline);
 
         cpass.set_push_constants(0, bytemuck::bytes_of(&self.params.as_std140()));
-        cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
+        cpass.dispatch_workgroups(self.manager.pipeline.work_group_count, 1, 1);
     }
 
     fn post_compute_pass_stage(&mut self, command_encoder: &mut wgpu::CommandEncoder) {
@@ -289,6 +289,6 @@ impl<'instance, T: Renderer> EventLoop<'instance, T> {
         cpass.set_pipeline(&self.manager.pipeline.post_compute_pipeline);
 
         cpass.set_push_constants(0, bytemuck::bytes_of(&self.params.as_std140()));
-        cpass.dispatch(self.manager.pipeline.work_group_count, 1, 1);
+        cpass.dispatch_workgroups(self.manager.pipeline.work_group_count, 1, 1);
     }
 }

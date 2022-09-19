@@ -59,7 +59,7 @@ impl GPUManager {
         );
 
         let required_downlevel_capabilities = pipeline::Pipeline::required_downlevel_capabilities();
-        let downlevel_capabilities = adapter.get_downlevel_properties();
+        let downlevel_capabilities = adapter.get_downlevel_capabilities();
         assert!(
             downlevel_capabilities.shader_model >= required_downlevel_capabilities.shader_model,
             "Adapter does not support the minimum shader model required to run this example: {:?}",
@@ -92,10 +92,10 @@ impl GPUManager {
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_preferred_format(&adapter).unwrap(),
+            format: surface.get_supported_formats(&adapter)[0],
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Mailbox,
+            present_mode: wgpu::PresentMode::Fifo,
         };
 
         surface.configure(&device, &config);

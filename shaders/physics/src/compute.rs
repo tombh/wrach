@@ -107,7 +107,7 @@ pub fn entry(
             });
             particle = particle.propogate(neighbours);
             positions_dst[id] = particle.position;
-            velocities_dst[id] = particle.velocity;
+            // velocities_dst[id] = particle.velocity;
             neighbours::NeighbouringParticles::place_particle_in_pixel(
                 id as particle::ParticleID,
                 particle.position,

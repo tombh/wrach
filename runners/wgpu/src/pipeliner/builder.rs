@@ -16,7 +16,7 @@ impl<'a> Builder<'a> {
     pub fn shader(device: &wgpu::Device, path: &str) -> ShaderModule {
         let shader_binary = rust_gpu_compiler::build(path);
         let spirv = wgpu::util::make_spirv(&shader_binary);
-        device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(path),
             source: spirv,
         })
@@ -182,8 +182,8 @@ impl<'a> Builder<'a> {
                 let position = vec2(x, y);
                 initial_position_data.push(position);
                 initial_velocity_data.push(vec2(
-                    rng.gen_range(-jitter, jitter),
-                    rng.gen_range(-jitter, jitter),
+                    rng.gen_range(-jitter..jitter),
+                    rng.gen_range(-jitter..jitter),
                 ));
                 physics::neighbours::NeighbouringParticles::place_particle_in_pixel(
                     count as physics::particle::ParticleID,

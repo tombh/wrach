@@ -16,4 +16,5 @@ cfg_if::cfg_if! {
     }
 }
 
+#[allow(deprecated)]
 pub const G: Vec2 = glam::const_vec2!([0.0, -10.0]);

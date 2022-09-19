@@ -183,7 +183,7 @@ impl Pipeline {
     }
 
     pub fn required_features() -> wgpu::Features {
-        wgpu::Features::CLEAR_COMMANDS | wgpu::Features::PUSH_CONSTANTS
+        wgpu::Features::PUSH_CONSTANTS
     }
 
     pub fn required_downlevel_capabilities() -> wgpu::DownlevelCapabilities {

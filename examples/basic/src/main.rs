@@ -28,7 +28,7 @@ impl SquareVertex {
         let fragment = wgpu::FragmentState {
             module: shader_module,
             entry_point: "main_fs",
-            targets: &[manager.config.format.into()],
+            targets: &[Some(manager.config.format.into())],
         };
 
         let pipeline_descriptor = wgpu::RenderPipelineDescriptor {
@@ -52,6 +52,7 @@ impl SquareVertex {
                     },
                 ],
             },
+            multiview: None,
             fragment: Some(fragment),
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
@@ -90,18 +91,18 @@ impl SquareVertex {
         command_encoder: &'a mut wgpu::CommandEncoder,
         view: &'a wgpu::TextureView,
     ) -> wgpu::RenderPass<'a> {
-        let color_attachments = [wgpu::RenderPassColorAttachment {
+        let color_attachments = wgpu::RenderPassColorAttachment {
             view,
             resolve_target: None,
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                 store: true,
             },
-        }];
+        };
 
         let render_pass_descriptor = wgpu::RenderPassDescriptor {
             label: None,
-            color_attachments: &color_attachments,
+            color_attachments: &[Some(color_attachments)],
             depth_stencil_attachment: None,
         };
 

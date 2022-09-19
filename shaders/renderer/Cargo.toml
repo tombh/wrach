@@ -12,7 +12,7 @@ spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", features = [ "g
 cfg-if = "1.0.0"
 
 [target.'cfg(not(target_arch = "spirv"))'.dependencies]
-crevice = { version = "0.8.0", features = ["glam"] }
+crevice = { version = "0.11.0", features = ["glam"] }
 # We need the native version of glam for crevice/bytemuck support
-glam = { version = "0.19.0", features = ["bytemuck"] }
+glam = { version = "0.21.3", features = ["bytemuck"] }
 
