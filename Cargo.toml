@@ -1,24 +1,84 @@
+[package]
+name = "wrach"
+version = "0.1.0"
+description = "2D pixel phyiscs simulation"
+edition = "2021"
+
 [workspace]
 resolver = "2"
+
 members = [
-	"shaders/rust-gpu-compiler",
-	"shaders/physics",
-	"shaders/renderer",
-	"runners/wgpu",
-	"examples/basic"
+  "shaders/physics",
+  "runners/bevy",
 ]
 
-# Enable incremental by default in release mode.
-[profile.release]
-incremental = true
-# HACK(eddyb) this is the default but without explicitly specifying it, Cargo
-# will treat the identical settings in `[profile.release.build-override]` below
-# as different sets of `rustc` flags and will not reuse artifacts between them.
-codegen-units = 256
+# Enable a small amount of optimization in the dev profile.
+[profile.dev]
+opt-level = 1
 
-# Compile build-dependencies in release mode with the same settings
-# as regular dependencies (including the incremental enabled above).
-[profile.release.build-override]
+# Enable a large amount of optimization in the dev profile for dependencies.
+[profile.dev.package."*"]
 opt-level = 3
-incremental = true
-codegen-units = 256
+
+# Enable more optimization in the release profile at the cost of compile time.
+[profile.release]
+# Compile the entire crate as one unit.
+# Slows compile times, marginal improvements.
+codegen-units = 1
+# Do a second optimization pass over the entire program, including dependencies.
+# Slows compile times, marginal improvements.
+lto = "thin"
+
+# Optimize for size in the wasm-release profile to reduce load times and bandwidth usage on web.
+[profile.wasm-release]
+# Default to release profile values.
+inherits = "release"
+# Optimize with size in mind (also try "z", sometimes it is better).
+# Slightly slows compile times, great improvements to file size and runtime performance.
+opt-level = "s"
+# Strip all debugging information from the binary to slightly reduce file size.
+strip = "debuginfo"
+
+# More WASM optimisations
+# https://bevyengine.org/learn/quick-start/getting-started/setup/#advanced-wasm-optimizations-optional
+
+
+# Development Dependencies
+
+[dev-dependencies]
+wrach-bevy = { path = "runners/bevy" }
+rand = "0.8.5"
+
+[dev-dependencies.bevy]
+version = "0.14.1"
+features = [
+  "wayland",
+  "embedded_watcher", # Hot-reloading `embedded_asset!` assets, like shaders
+]
+
+
+# Lints
+
+[workspace.lints.rust]
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = 0 }
+pedantic = { level = "warn", priority = 0 }
+nursery = { level = "warn", priority = 0 }
+cargo = { level = "warn", priority = 0 }
+restriction = { level = "warn", priority = 0 }
+blanket_clippy_restriction_lints = { level = "allow", priority = 1 }
+
+absolute_paths = { level = "allow", priority = 1 }
+implicit_return = { level = "allow", priority = 1 }
+single_call_fn = { level = "allow", priority = 1 }
+question_mark_used = { level = "allow", priority = 1 }
+multiple_crate_versions = { level = "allow", priority = 1 }
+float_arithmetic = { level = "allow", priority = 1 }
+separated_literal_suffix = { level = "allow", priority = 1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+
+# I'd like to set this to "warn", but it seems that it can't be disabled on a per-crate basis
+# See: https://github.com/rust-lang/rust-clippy/issues/7342
+cargo_common_metadata = { level = "allow", priority = 1 }

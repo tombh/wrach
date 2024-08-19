@@ -1,0 +1,23 @@
+[package]
+name = "wrach-bevy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Remove "shader_format_spirv" feature when this issue is fixed:
+#   https://github.com/AnthonyTornetta/bevy_easy_compute/issues/7
+bevy_easy_compute = { git = "https://github.com/AnthonyTornetta/bevy_easy_compute", features = ["shader_format_spirv"] }
+rand = "0.8.5"
+
+[dependencies.bevy]
+version = "0.14.1"
+default-features = false
+# # See https://github.com/bevyengine/bevy/blob/main/docs/cargo_features.md
+features = [
+  "bevy_core_pipeline", # Provides cameras and other basic render pipeline features
+  "multi_threaded", # Enables multithreaded parallelism in the engine. Disabling it forces all engine tasks to run on a single thread.
+  "shader_format_spirv", # To enable Rust-GPU compiled shaders
+]
+
+[lints]
+workspace = true
