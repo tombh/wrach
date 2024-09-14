@@ -9,4 +9,6 @@ mod plugin;
 mod state;
 
 pub use crate::plugin::WrachPlugin;
+pub use crate::state::GPUUpload;
+pub use crate::state::Particle;
 pub use crate::state::WrachState;

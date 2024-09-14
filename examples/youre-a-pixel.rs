@@ -11,9 +11,10 @@ use bevy::{
     window::PrimaryWindow,
 };
 
-use wrach_bevy::{WrachPlugin, WrachState};
+use rand::Rng;
+use wrach_bevy::{GPUUpload, Particle, WrachPlugin, WrachState};
 
-const NUMBER_OF_PARTICLES: i32 = 10000;
+const NUMBER_OF_PARTICLES: u32 = 50000;
 
 fn main() {
     App::new()
@@ -21,7 +22,7 @@ fn main() {
         .add_plugins(LogDiagnosticsPlugin::default())
         .add_plugins(FrameTimeDiagnosticsPlugin)
         .add_plugins(WrachPlugin {
-            size: NUMBER_OF_PARTICLES,
+            max_particles: NUMBER_OF_PARTICLES,
         })
         .add_systems(Startup, setup)
         .add_systems(PreUpdate, keyboard_events)
@@ -36,7 +37,17 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut state: ResMut<WrachState>,
 ) {
+    let mut particles: Vec<Particle> = Vec::new();
+    for _ in 0..NUMBER_OF_PARTICLES {
+        particles.push(Particle {
+            position: (random_float(1.0), random_float(1.0)),
+            velocity: (random_float(0.005), random_float(0.005)),
+        });
+    }
+    state.add_particles(particles);
+
     commands.spawn(Camera2dBundle::default());
 
     let boid_mesh_you = meshes.add(RegularPolygon::new(5., 4));
@@ -65,6 +76,10 @@ fn setup(
     }
 }
 
+fn random_float(magnitude: f32) -> f32 {
+    rand::thread_rng().gen_range(-magnitude..magnitude)
+}
+
 fn move_entities(
     state: Res<WrachState>,
     window: Query<&Window, With<PrimaryWindow>>,
@@ -72,7 +87,7 @@ fn move_entities(
 ) {
     let window = window.single();
 
-    if state.positions.is_empty() {
+    if state.positions.len() < NUMBER_OF_PARTICLES as usize {
         return;
     }
 
@@ -93,29 +108,35 @@ fn keyboard_events(
     mut app_exit_events: ResMut<Events<bevy::app::AppExit>>,
 ) {
     let delta = 0.001;
-    let mut current_velocity = state.velocities[0];
 
     for event in keyboard_input_events.read() {
         if event.state == ButtonState::Released {
             continue;
         }
 
+        let mut current_velocity = state.velocities[0];
+        let mut gpu_uploads = GPUUpload::default();
+
         match &event.logical_key {
             Key::ArrowUp => {
                 current_velocity.y += delta;
-                state.overwrite = vec![current_velocity];
+                gpu_uploads.velocities = vec![current_velocity];
+                state.gpu_upload(gpu_uploads);
             }
             Key::ArrowDown => {
                 current_velocity.y -= delta;
-                state.overwrite = vec![current_velocity];
+                gpu_uploads.velocities = vec![current_velocity];
+                state.gpu_upload(gpu_uploads);
             }
             Key::ArrowLeft => {
                 current_velocity.x -= delta;
-                state.overwrite = vec![current_velocity];
+                gpu_uploads.velocities = vec![current_velocity];
+                state.gpu_upload(gpu_uploads);
             }
             Key::ArrowRight => {
                 current_velocity.x += delta;
-                state.overwrite = vec![current_velocity];
+                gpu_uploads.velocities = vec![current_velocity];
+                state.gpu_upload(gpu_uploads);
             }
             _ => {}
         }

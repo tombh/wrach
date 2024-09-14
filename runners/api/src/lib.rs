@@ -2,7 +2,7 @@
 
 use bevy::prelude::PluginGroup;
 use bevy::{app::App, winit::WinitPlugin, DefaultPlugins};
-use wrach_bevy::{WrachPlugin, WrachState};
+use wrach_bevy::{Particle, WrachPlugin, WrachState};
 
 /// Main struct for Wrach physics simulations
 #[non_exhaustive]
@@ -19,7 +19,7 @@ impl Wrach {
     /// Instantiate
     #[must_use]
     #[inline]
-    pub fn new(number_of_particles: i32) -> Self {
+    pub fn new(max_particles: u32) -> Self {
         let mut wrach = Self {
             app: App::new(),
             positions: Vec::new(),
@@ -28,9 +28,7 @@ impl Wrach {
         wrach
             .app
             .add_plugins(DefaultPlugins.build().disable::<WinitPlugin>())
-            .add_plugins(WrachPlugin {
-                size: number_of_particles,
-            });
+            .add_plugins(WrachPlugin { max_particles });
         wrach.app.finish();
         wrach.app.cleanup();
         wrach
@@ -40,14 +38,14 @@ impl Wrach {
     #[inline]
     pub fn tick(&mut self) {
         self.app.update();
-        self.update_data();
+        self.read_data();
     }
 
     /// Get data from the simulation
     // TODO: Check performance of this. Are we using the data directly? There's no copying going
     // on?
     #[inline]
-    pub fn update_data(&mut self) {
+    pub fn read_data(&mut self) {
         self.positions = self
             .app
             .world()
@@ -66,9 +64,17 @@ impl Wrach {
             .map(|particle| (particle.x, particle.y))
             .collect();
     }
+
+    /// Add particles to the simulation
+    #[inline]
+    pub fn add_particles(&mut self, particles: Vec<Particle>) {
+        let mut state = self.app.world_mut().resource_mut::<WrachState>();
+        state.add_particles(particles);
+    }
 }
 
 #[allow(clippy::indexing_slicing)]
+#[allow(clippy::default_numeric_fallback)]
 #[cfg(test)]
 mod test {
     use super::*;
@@ -76,7 +82,19 @@ mod test {
     #[test]
     fn test_api_returns_data() {
         let mut wrach = Wrach::new(3);
-        wrach.tick();
+
+        let mut particles: Vec<Particle> = Vec::new();
+        for _ in 0..3 {
+            particles.push(Particle {
+                position: (0.5, 0.5),
+                velocity: (0.5, 0.5),
+            });
+        }
+        wrach.add_particles(particles);
+
+        for _ in 0..3 {
+            wrach.tick();
+        }
 
         assert_eq!(wrach.positions.len(), 3);
         assert_ne!(wrach.positions[0], (0.0, 0.0));

@@ -23,19 +23,19 @@ impl PhysicsComputeWorker {
 impl ComputeWorker for PhysicsComputeWorker {
     fn build(world: &mut World) -> AppComputeWorker<Self> {
         let state = world.resource::<WrachState>();
-        let positions = state.positions.clone();
-        let velocities = state.velocities.clone();
+
+        #[allow(clippy::expect_used)]
+        let max_particles: usize = state
+            .max_particles
+            .try_into()
+            .expect("Couldn't convert `max_particles` to `Vec` capacity");
+
+        let positions = vec![Vec2::default(); max_particles];
+        let velocities = vec![Vec2::default(); max_particles];
 
         // TODO: Explain and explore workgroup sizes
         let partition = 8;
-        let main_workgroup_size = u32::div_ceil(
-            #[allow(clippy::expect_used)]
-            positions
-                .len()
-                .try_into()
-                .expect("Couldn't convert amount of particles to workgroup size type"),
-            partition,
-        );
+        let main_workgroup_size = u32::div_ceil(state.max_particles, partition);
         let workgroups = [main_workgroup_size, partition, 1];
 
         AppComputeWorkerBuilder::new(world)
