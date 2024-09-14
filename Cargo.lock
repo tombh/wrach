@@ -4606,6 +4606,15 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "rand",
+ "wrach-api",
+ "wrach-bevy",
+]
+
+[[package]]
+name = "wrach-api"
+version = "0.1.0"
+dependencies = [
+ "bevy",
  "wrach-bevy",
 ]
 

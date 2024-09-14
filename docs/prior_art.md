@@ -62,13 +62,17 @@ colour grading techniques. And he made a 6 hour long video explaining it all htt
   - Implemented https://github.com/EmbarkStudios/kajiya
 - https://www.youtube.com/@Tantandev
   - Lots of videos, Rust
-- https://www.youtube.com/@ethangore8697
-- https://www.youtube.com/@774
-- https://www.youtube.com/@TheRaticide
+- https://www.youtube.com/@dreamtowards
+  - Rust/Bevy
+  - Open Source and playable
 - https://www.youtube.com/@BodhiDon
+  - https://github.com/Dreamtowards/Ethertum
   - Making great progress on an actual game
   - Unity
   - Dev builds available at https://discord.com/invite/KzQVEFnNQb
+- https://www.youtube.com/@ethangore8697
+- https://www.youtube.com/@774
+- https://www.youtube.com/@TheRaticide
 - https://www.youtube.com/@MaxMakesGames
 - https://www.youtube.com/channel/UCM2RhfMLoLqG24e_DYgTQeA
 - https://www.youtube.com/@_rey
@@ -108,4 +112,5 @@ colour grading techniques. And he made a 6 hour long video explaining it all htt
 
 ### Miscellaneous
 
+- https://voxel.wiki
 - https://www.reddit.com/r/VoxelGameDev

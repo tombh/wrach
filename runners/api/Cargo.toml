@@ -1,0 +1,11 @@
+[package]
+name = "wrach-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { workspace = true }
+wrach-bevy = { path = "../bevy" }
+
+[lints]
+workspace = true
