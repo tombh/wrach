@@ -5,6 +5,7 @@ use bevy::color::palettes::css;
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::input::ButtonState;
+use bevy::window::WindowResolution;
 use bevy::{
     prelude::*,
     sprite::{MaterialMesh2dBundle, Mesh2dHandle},
@@ -14,16 +15,29 @@ use bevy::{
 use rand::Rng;
 use wrach_bevy::{GPUUpload, Particle, WrachPlugin, WrachState};
 
-const NUMBER_OF_PARTICLES: u32 = 50000;
+const NUMBER_OF_PARTICLES: u32 = 20000;
+const SCALE: f32 = 3.0;
 
 fn main() {
+    let wrach = WrachPlugin::default();
+    let window_width = wrach.config.dimensions.0 as f32 * SCALE;
+    let window_height = wrach.config.dimensions.1 as f32 * SCALE;
+
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    resolution: WindowResolution::new(window_width, window_height)
+                        .with_scale_factor_override(1.0),
+                    title: "Wrach example: You're a pixel".into(),
+                    ..default()
+                }),
+                ..default()
+            }),
+        )
         .add_plugins(LogDiagnosticsPlugin::default())
         .add_plugins(FrameTimeDiagnosticsPlugin)
-        .add_plugins(WrachPlugin {
-            max_particles: NUMBER_OF_PARTICLES,
-        })
+        .add_plugins(wrach)
         .add_systems(Startup, setup)
         .add_systems(PreUpdate, keyboard_events)
         .add_systems(PostUpdate, move_entities)
@@ -42,15 +56,18 @@ fn setup(
     let mut particles: Vec<Particle> = Vec::new();
     for _ in 0..NUMBER_OF_PARTICLES {
         particles.push(Particle {
-            position: (random_float(1.0), random_float(1.0)),
-            velocity: (random_float(0.005), random_float(0.005)),
+            position: (
+                random_float(state.config.dimensions.0 as f32).abs(),
+                random_float(state.config.dimensions.1 as f32).abs(),
+            ),
+            velocity: (random_float(1.0), random_float(1.0)),
         });
     }
     state.add_particles(particles);
 
     commands.spawn(Camera2dBundle::default());
 
-    let boid_mesh_you = meshes.add(RegularPolygon::new(5., 4));
+    let boid_mesh_you = meshes.add(RegularPolygon::new(3.0 * SCALE, 4));
 
     // A single red "pixel" that you control
     commands.spawn((
@@ -62,7 +79,7 @@ fn setup(
         },
     ));
 
-    let boid_mesh = meshes.add(RegularPolygon::new(1., 4));
+    let boid_mesh = meshes.add(RegularPolygon::new(1.0 * SCALE, 4));
     let boid_material = materials.add(Color::from(css::ANTIQUE_WHITE));
     for i in 1..NUMBER_OF_PARTICLES {
         commands.spawn((
@@ -93,8 +110,8 @@ fn move_entities(
 
     pixel.par_iter_mut().for_each(|(mut transform, particle)| {
         let world_pos = Vec2::new(
-            (window.width() / 2.) * (state.positions[particle.0].x),
-            (window.height() / 2.) * (state.positions[particle.0].y),
+            (state.positions[particle.0].x * SCALE) - (window.width() / 2.0),
+            (state.positions[particle.0].y * SCALE) - (window.height() / 2.0),
         );
 
         transform.translation = world_pos.extend(0.);
@@ -107,7 +124,7 @@ fn keyboard_events(
     mut state: ResMut<WrachState>,
     mut app_exit_events: ResMut<Events<bevy::app::AppExit>>,
 ) {
-    let delta = 0.001;
+    let delta = 0.1;
 
     for event in keyboard_input_events.read() {
         if event.state == ButtonState::Released {

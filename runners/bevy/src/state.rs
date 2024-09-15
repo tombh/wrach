@@ -2,10 +2,14 @@
 
 use bevy::{math::Vec2, prelude::Resource};
 
+use crate::WrachConfig;
+
 /// All simulation state, exported for end users
 #[derive(Default, Resource)]
 #[allow(clippy::exhaustive_structs)]
 pub struct WrachState {
+    /// User-defined config
+    pub config: WrachConfig,
     /// The maximum number of particles to simulate
     pub max_particles: u32,
     /// The particle positions
@@ -30,9 +34,9 @@ pub struct GPUUpload {
 /// Wrach's representation of a particle. Probably will only ever be used for inserting.
 #[allow(clippy::exhaustive_structs)]
 pub struct Particle {
-    /// Position of particle
+    /// Position of particle in units of `WrachConfig::dimensions`
     pub position: Position,
-    /// Velocity of particle
+    /// Velocity of particle in x/y components
     pub velocity: Velocity,
 }
 
@@ -45,8 +49,14 @@ impl WrachState {
     /// Instantiate
     #[inline]
     #[must_use]
-    pub fn new(max_particles: u32) -> Self {
+    pub fn new(config: WrachConfig) -> Self {
+        // We can assume that this won't overflow u32: 4_294_967_295
+        // I look forward to this being a problem!
+        #[allow(clippy::arithmetic_side_effects)]
+        let max_particles = config.dimensions.0 * config.dimensions.1;
+
         Self {
+            config,
             max_particles,
             ..Default::default()
         }

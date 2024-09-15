@@ -43,6 +43,9 @@ strip = "debuginfo"
 # More WASM optimisations
 # https://bevyengine.org/learn/quick-start/getting-started/setup/#advanced-wasm-optimizations-optional
 
+[workspace.dependencies]
+spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu" }
+
 [workspace.dependencies.bevy]
 version = "0.14.1"
 default-features = false

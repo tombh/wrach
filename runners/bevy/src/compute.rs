@@ -3,7 +3,7 @@
 use bevy::{prelude::*, reflect::TypePath};
 use bevy_easy_compute::prelude::*;
 
-use crate::WrachState;
+use crate::{config_shader::ShaderWorldConfig, WrachState};
 
 /// The main GPU compute pipeline for physics simulations
 #[derive(Resource)]
@@ -18,6 +18,8 @@ impl PhysicsComputeWorker {
     pub const VELOCITIES_BUFFER_IN: &'static str = "velocities_in";
     /// Pixel velocities buffer ID for writing
     pub const VELOCITIES_BUFFER_OUT: &'static str = "velocities_out";
+    /// Config data for the simulation
+    pub const WORLD_CONFIG_UNIFORM: &'static str = "world_config";
 }
 
 impl ComputeWorker for PhysicsComputeWorker {
@@ -38,7 +40,18 @@ impl ComputeWorker for PhysicsComputeWorker {
         let main_workgroup_size = u32::div_ceil(state.max_particles, partition);
         let workgroups = [main_workgroup_size, partition, 1];
 
+        let wrach_world_config = ShaderWorldConfig {
+            #[allow(clippy::cast_precision_loss)]
+            #[allow(clippy::as_conversions)]
+            dimensions: Vec2::new(
+                state.config.dimensions.0 as f32,
+                state.config.dimensions.1 as f32,
+            ),
+            view_anchor: Vec2::new(0.0, 0.0),
+        };
+
         AppComputeWorkerBuilder::new(world)
+            .add_uniform(Self::WORLD_CONFIG_UNIFORM, &wrach_world_config)
             .add_staging(Self::POSITIONS_BUFFER_IN, &positions)
             .add_staging(Self::POSITIONS_BUFFER_OUT, &positions)
             .add_staging(Self::VELOCITIES_BUFFER_IN, &velocities)
@@ -46,6 +59,7 @@ impl ComputeWorker for PhysicsComputeWorker {
             .add_pass::<FirstPassShader>(
                 workgroups,
                 &[
+                    Self::WORLD_CONFIG_UNIFORM,
                     Self::POSITIONS_BUFFER_IN,
                     Self::POSITIONS_BUFFER_OUT,
                     Self::VELOCITIES_BUFFER_IN,

@@ -13,6 +13,7 @@ Using a dedicated Rust GPU shader compiler: https://github.com/tombh/rust-gpu-co
 
 ## Workflow
 
+- Tests: `cargo test --workspace`
 - Lint `cargo clippy --all --all-targets --all-features`
 - Remove unused deps: `cargo shear --fix`
 

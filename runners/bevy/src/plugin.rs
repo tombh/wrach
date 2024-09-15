@@ -2,13 +2,22 @@
 use bevy::{asset::embedded_asset, prelude::*};
 use bevy_easy_compute::prelude::*;
 
-use crate::{compute::PhysicsComputeWorker, WrachState};
+use crate::{compute::PhysicsComputeWorker, WrachConfig, WrachState};
 
-/// All the config for the Wrach Bevy plugin
+/// The Wrach Bevy Plugin
 #[allow(clippy::exhaustive_structs)]
 pub struct WrachPlugin {
-    /// Maximum Number of particles to simulate
-    pub max_particles: u32,
+    /// All the user-defineable config for Wrach
+    pub config: WrachConfig,
+}
+
+impl Default for WrachPlugin {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            config: WrachConfig::default(),
+        }
+    }
 }
 
 #[allow(clippy::missing_trait_methods)]
@@ -17,7 +26,7 @@ impl Plugin for WrachPlugin {
     fn build(&self, app: &mut App) {
         embedded_asset!(app, "../../../assets/shaders/wrach_physics.spv");
 
-        app.insert_resource(WrachState::new(self.max_particles))
+        app.insert_resource(WrachState::new(self.config))
             .add_plugins(AppComputePlugin)
             .add_plugins(AppComputeWorkerPlugin::<PhysicsComputeWorker>::default())
             .add_systems(PreUpdate, maybe_upload_to_gpu)

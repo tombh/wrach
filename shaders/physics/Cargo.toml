@@ -7,8 +7,7 @@ edition = "2021"
 crate-type = ["dylib"]
 
 [dependencies]
-# TODO: Add to workspace root and pin to a hash
-spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu" }
+spirv-std = { workspace = true }
 
 [lints]
 workspace = true

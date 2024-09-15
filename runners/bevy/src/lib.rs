@@ -5,9 +5,12 @@
 #![allow(clippy::pub_use)]
 
 mod compute;
+mod config_app;
+mod config_shader;
 mod plugin;
 mod state;
 
+pub use crate::config_app::WrachConfig;
 pub use crate::plugin::WrachPlugin;
 pub use crate::state::GPUUpload;
 pub use crate::state::Particle;
