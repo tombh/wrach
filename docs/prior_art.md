@@ -76,10 +76,11 @@ colour grading techniques. And he made a 6 hour long video explaining it all htt
 - https://www.youtube.com/@MaxMakesGames
 - https://www.youtube.com/channel/UCM2RhfMLoLqG24e_DYgTQeA
 - https://www.youtube.com/@_rey
-- https://www.youtube.com/@xima1: Raytraced audio!
+- https://www.youtube.com/@xima1 Raytraced audio!
 - https://www.youtube.com/@voxelbee
 - https://www.youtube.com/@danygankoff
 - https://www.youtube.com/@cyber-gate
+- https://www.youtube.com/@NephPlays C#/OpenGL
 
 ### Code
 

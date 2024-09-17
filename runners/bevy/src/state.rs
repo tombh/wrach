@@ -1,37 +1,28 @@
 //! All the state for the simulation, both the physics itself and state for managing the simulation
 
-use bevy::{math::Vec2, prelude::Resource};
+use bevy::{
+    math::{Vec2, Vec4},
+    prelude::Resource,
+};
 
-use crate::WrachConfig;
+use crate::{particle_store::ParticleStore, spatial_bin::PackedData, WrachConfig};
 
 /// All simulation state, exported for end users
-#[derive(Default, Resource)]
+#[derive(Resource)]
 #[allow(clippy::exhaustive_structs)]
 pub struct WrachState {
     /// User-defined config
     pub config: WrachConfig,
-    /// The maximum number of particles to simulate
-    pub max_particles: u32,
+    /// Store for all partciles
+    pub particle_store: ParticleStore,
     /// The particle positions
-    pub positions: Vec<Vec2>,
-    /// The particle velocities
-    pub velocities: Vec<Vec2>,
+    pub packed_data: PackedData,
     /// Data to send to the GPU, typically for CPU-side influence over the simulation
-    pub gpu_uploads: Vec<GPUUpload>,
-}
-
-/// Data that the user wants to send to the GPU
-#[derive(Default)]
-#[allow(clippy::exhaustive_structs)]
-pub struct GPUUpload {
-    /// Particle positions to overwrite
-    pub positions: Vec<Vec2>,
-    /// Particle velocities
-    pub velocities: Vec<Vec2>,
-    // TODO: Add location at which to write
+    pub gpu_uploads: Vec<PackedData>,
 }
 
 /// Wrach's representation of a particle. Probably will only ever be used for inserting.
+#[derive(Clone, Copy)]
 #[allow(clippy::exhaustive_structs)]
 pub struct Particle {
     /// Position of particle in units of `WrachConfig::dimensions`
@@ -40,47 +31,44 @@ pub struct Particle {
     pub velocity: Velocity,
 }
 
-/// Wrach's type for particle position, could use some sort of `Vec2` instead
-pub type Position = (f32, f32);
-/// Wrach's type for particle velocity, could use some sort of `Vec2` instead
-pub type Velocity = (f32, f32);
+/// Wrach's type for particle position
+pub type Position = Vec2;
+/// Wrach's type for particle velocity
+pub type Velocity = Vec2;
 
 impl WrachState {
     /// Instantiate
     #[inline]
     #[must_use]
     pub fn new(config: WrachConfig) -> Self {
-        // We can assume that this won't overflow u32: 4_294_967_295
-        // I look forward to this being a problem!
-        #[allow(clippy::arithmetic_side_effects)]
-        let max_particles = config.dimensions.0 * config.dimensions.1;
-
+        let viewport = Vec4::new(
+            0.0,
+            0.0,
+            config.dimensions.0.into(),
+            config.dimensions.1.into(),
+        );
         Self {
             config,
-            max_particles,
-            ..Default::default()
+            particle_store: ParticleStore::new(config.cell_size, viewport),
+            packed_data: PackedData::default(),
+            gpu_uploads: Vec::default(),
         }
     }
 
     /// Overwrites the simulation data from the first pixel to the size of the overwriting data
     #[inline]
-    pub fn gpu_upload(&mut self, upload: GPUUpload) {
+    pub fn gpu_upload(&mut self, upload: PackedData) {
         self.gpu_uploads.push(upload);
     }
 
     /// Overwrites the simulation data from the first pixel to the size of the overwriting data
     #[inline]
     pub fn add_particles(&mut self, particles: Vec<Particle>) {
-        let mut upload = GPUUpload {
-            positions: self.positions.clone(),
-            velocities: self.velocities.clone(),
-        };
-
         for particle in particles {
-            upload.positions.push(particle.position.into());
-            upload.velocities.push(particle.velocity.into());
+            self.particle_store.add_particle(particle);
         }
 
+        let upload = self.particle_store.create_packed_data();
         self.gpu_upload(upload);
     }
 }

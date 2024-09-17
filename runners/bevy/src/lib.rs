@@ -7,11 +7,13 @@
 mod compute;
 mod config_app;
 mod config_shader;
+mod particle_store;
 mod plugin;
+mod spatial_bin;
 mod state;
 
 pub use crate::config_app::WrachConfig;
 pub use crate::plugin::WrachPlugin;
-pub use crate::state::GPUUpload;
+pub use crate::spatial_bin::PackedData;
 pub use crate::state::Particle;
 pub use crate::state::WrachState;

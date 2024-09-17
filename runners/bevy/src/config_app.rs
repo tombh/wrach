@@ -6,7 +6,7 @@
 pub struct WrachConfig {
     /// Dimensions of the realtime view onto the simulation. Doesn't necessarily imply the size of
     /// any window, that should be handled outside this plugin
-    pub dimensions: (u32, u32),
+    pub dimensions: (u16, u16),
     /// Should particles be limited to within the viewport dimensions? Default is false, therefore
     /// the viewport must move to interact with the entire simulation.
     pub boundaries_as_dimensions: bool,

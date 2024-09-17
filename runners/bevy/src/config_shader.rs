@@ -10,7 +10,7 @@ use bevy::render::render_resource::ShaderType;
 #[derive(ShaderType)]
 pub struct ShaderWorldConfig {
     /// Dimensions of the view onto the simulation
-    pub dimensions: Vec2,
+    pub view_dimensions: Vec2,
     /// Current position of the viewoport. Measured from the bottom-left corner
     pub view_anchor: Vec2,
 }

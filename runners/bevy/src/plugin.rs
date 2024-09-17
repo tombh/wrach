@@ -2,7 +2,7 @@
 use bevy::{asset::embedded_asset, prelude::*};
 use bevy_easy_compute::prelude::*;
 
-use crate::{compute::PhysicsComputeWorker, WrachConfig, WrachState};
+use crate::{compute::PhysicsComputeWorker, spatial_bin::PackedData, WrachConfig, WrachState};
 
 /// The Wrach Bevy Plugin
 #[allow(clippy::exhaustive_structs)]
@@ -48,6 +48,11 @@ fn maybe_upload_to_gpu(
     }
 
     for uploads in &wrach_state.gpu_uploads {
+        if !uploads.indices.is_empty() {
+            // error!("{:?}", uploads.indices);
+            compute_worker.write_slice(PhysicsComputeWorker::INDICES_BUFFER_IN, &uploads.indices);
+        }
+
         if !uploads.positions.is_empty() {
             compute_worker.write_slice(
                 PhysicsComputeWorker::POSITIONS_BUFFER_IN,
@@ -78,6 +83,22 @@ fn tick(
         return;
     };
 
-    wrach_state.positions = compute_worker.read_vec(PhysicsComputeWorker::POSITIONS_BUFFER_OUT);
-    wrach_state.velocities = compute_worker.read_vec(PhysicsComputeWorker::VELOCITIES_BUFFER_OUT);
+    let update = PackedData {
+        indices: compute_worker.read_vec(PhysicsComputeWorker::INDICES_BUFFER_OUT),
+        positions: compute_worker.read_vec(PhysicsComputeWorker::POSITIONS_BUFFER_OUT),
+        velocities: compute_worker.read_vec(PhysicsComputeWorker::VELOCITIES_BUFFER_OUT),
+    };
+
+    wrach_state
+        .packed_data
+        .positions
+        .clone_from(&update.positions);
+    wrach_state
+        .packed_data
+        .velocities
+        .clone_from(&update.velocities);
+
+    wrach_state.particle_store.update_from_gpu(&update);
+    let upload = wrach_state.particle_store.create_packed_data();
+    wrach_state.gpu_upload(upload);
 }

@@ -1,5 +1,5 @@
 use rand::Rng;
-use wrach_api::WrachAPI;
+use wrach_api::{Vec2, WrachAPI};
 use wrach_bevy::{Particle, WrachConfig};
 
 extern crate bevy;
@@ -12,8 +12,8 @@ fn main() {
         let x = rand::thread_rng().gen_range(-1.0..1.0);
         let y = rand::thread_rng().gen_range(-1.0..1.0);
         particles.push(Particle {
-            position: (x, y),
-            velocity: (x, y),
+            position: Vec2::new(x, y),
+            velocity: Vec2::new(x, y),
         });
     }
     wrach.add_particles(particles);

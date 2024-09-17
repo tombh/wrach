@@ -1,8 +1,14 @@
 //! Rust interface to Wrach simulations
 
+// Apparently `pub use` is bad?
+// https://rust-lang.github.io/rust-clippy/master/index.html#/pub_use
+#![allow(clippy::pub_use)]
+
 use bevy::prelude::PluginGroup;
 use bevy::{app::App, winit::WinitPlugin, DefaultPlugins};
 use wrach_bevy::{Particle, WrachConfig, WrachPlugin, WrachState};
+
+pub use bevy::math::Vec2;
 
 /// Main struct for Wrach physics simulations
 #[non_exhaustive]
@@ -51,6 +57,7 @@ impl WrachAPI {
             .app
             .world()
             .resource::<WrachState>()
+            .packed_data
             .positions
             .iter()
             .map(|particle| (particle.x, particle.y))
@@ -60,6 +67,7 @@ impl WrachAPI {
             .app
             .world()
             .resource::<WrachState>()
+            .packed_data
             .velocities
             .iter()
             .map(|particle| (particle.x, particle.y))
@@ -78,20 +86,23 @@ impl WrachAPI {
 #[allow(clippy::default_numeric_fallback)]
 #[cfg(test)]
 mod test {
+    use bevy::math::Vec2;
+
     use super::*;
 
     #[test]
     fn test_api_returns_data() {
         let mut wrach = WrachAPI::new(WrachConfig {
-            dimensions: (3, 3),
+            dimensions: (10, 10),
+            cell_size: 3,
             ..Default::default()
         });
 
         let mut particles: Vec<Particle> = Vec::new();
         for _ in 0..3 {
             particles.push(Particle {
-                position: (0.5, 0.5),
-                velocity: (0.5, 0.5),
+                position: Vec2::new(5.0, 5.0),
+                velocity: Vec2::new(0.5, 0.5),
             });
         }
         wrach.add_particles(particles);
@@ -100,9 +111,9 @@ mod test {
             wrach.tick();
         }
 
-        assert_eq!(wrach.positions.len(), 9);
+        assert_eq!(wrach.positions.len(), 164);
         assert_ne!(wrach.positions[0], (0.0, 0.0));
-        assert_eq!(wrach.velocities.len(), 9);
+        assert_eq!(wrach.velocities.len(), 164);
         assert_ne!(wrach.velocities[0], (0.0, 0.0));
     }
 }

@@ -13,9 +13,9 @@ use bevy::{
 };
 
 use rand::Rng;
-use wrach_bevy::{GPUUpload, Particle, WrachPlugin, WrachState};
+use wrach_bevy::{Particle, WrachPlugin, WrachState};
 
-const NUMBER_OF_PARTICLES: u32 = 20000;
+const NUMBER_OF_PARTICLES: u32 = 10;
 const SCALE: f32 = 3.0;
 
 fn main() {
@@ -56,11 +56,11 @@ fn setup(
     let mut particles: Vec<Particle> = Vec::new();
     for _ in 0..NUMBER_OF_PARTICLES {
         particles.push(Particle {
-            position: (
+            position: Vec2::new(
                 random_float(state.config.dimensions.0 as f32).abs(),
                 random_float(state.config.dimensions.1 as f32).abs(),
             ),
-            velocity: (random_float(1.0), random_float(1.0)),
+            velocity: Vec2::new(random_float(1.0), random_float(1.0)),
         });
     }
     state.add_particles(particles);
@@ -104,14 +104,14 @@ fn move_entities(
 ) {
     let window = window.single();
 
-    if state.positions.len() < NUMBER_OF_PARTICLES as usize {
+    if state.packed_data.positions.len() < NUMBER_OF_PARTICLES as usize {
         return;
     }
 
     pixel.par_iter_mut().for_each(|(mut transform, particle)| {
         let world_pos = Vec2::new(
-            (state.positions[particle.0].x * SCALE) - (window.width() / 2.0),
-            (state.positions[particle.0].y * SCALE) - (window.height() / 2.0),
+            (state.packed_data.positions[particle.0].x * SCALE) - (window.width() / 2.0),
+            (state.packed_data.positions[particle.0].y * SCALE) - (window.height() / 2.0),
         );
 
         transform.translation = world_pos.extend(0.);
@@ -121,40 +121,19 @@ fn move_entities(
 
 fn keyboard_events(
     mut keyboard_input_events: EventReader<KeyboardInput>,
-    mut state: ResMut<WrachState>,
     mut app_exit_events: ResMut<Events<bevy::app::AppExit>>,
 ) {
-    let delta = 0.1;
-
     for event in keyboard_input_events.read() {
         if event.state == ButtonState::Released {
             continue;
         }
 
-        let mut current_velocity = state.velocities[0];
-        let mut gpu_uploads = GPUUpload::default();
-
+        // TODO: Update uniform buffer with key presses
         match &event.logical_key {
-            Key::ArrowUp => {
-                current_velocity.y += delta;
-                gpu_uploads.velocities = vec![current_velocity];
-                state.gpu_upload(gpu_uploads);
-            }
-            Key::ArrowDown => {
-                current_velocity.y -= delta;
-                gpu_uploads.velocities = vec![current_velocity];
-                state.gpu_upload(gpu_uploads);
-            }
-            Key::ArrowLeft => {
-                current_velocity.x -= delta;
-                gpu_uploads.velocities = vec![current_velocity];
-                state.gpu_upload(gpu_uploads);
-            }
-            Key::ArrowRight => {
-                current_velocity.x += delta;
-                gpu_uploads.velocities = vec![current_velocity];
-                state.gpu_upload(gpu_uploads);
-            }
+            Key::ArrowUp => {}
+            Key::ArrowDown => {}
+            Key::ArrowLeft => {}
+            Key::ArrowRight => {}
             _ => {}
         }
 

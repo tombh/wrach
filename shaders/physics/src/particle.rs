@@ -48,8 +48,8 @@ impl<'particle> Particle {
         let viewport = vec4(
             world_config.view_anchor.x,
             world_config.view_anchor.y,
-            world_config.view_anchor.x + world_config.dimensions.x,
-            world_config.view_anchor.y + world_config.dimensions.y,
+            world_config.view_anchor.x + world_config.view_dimensions.x,
+            world_config.view_anchor.y + world_config.view_dimensions.y,
         );
 
         if self.position.x > viewport.z {
