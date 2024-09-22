@@ -4,7 +4,26 @@
 // https://rust-lang.github.io/rust-clippy/master/index.html#/pub_use
 #![allow(clippy::pub_use)]
 
-mod compute;
+/// Tests
+#[cfg(test)]
+mod tests {
+    pub mod utils;
+}
+
+/// All GPU-compute related code
+mod compute {
+    pub use builder::PhysicsComputeWorker;
+    mod builder;
+
+    #[path = "01_integration.rs"]
+    mod integration;
+    #[path = "04_pack_particle_data.rs"]
+    mod pack_particle_data;
+    #[path = "02_particles_cell_count.rs"]
+    mod particles_cell_count;
+    #[path = "03_prefix_sum.rs"]
+    mod prefix_sum;
+}
 mod config_app;
 mod config_shader;
 mod particle_store;

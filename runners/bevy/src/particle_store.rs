@@ -1,7 +1,5 @@
 //! A hash store for particles
 
-// TODO: Persist with https://github.com/cberner/redb
-
 use bevy::{
     math::{Vec2, Vec4},
     utils::hashbrown::HashMap,
@@ -18,6 +16,9 @@ pub struct ParticleStore {
     pub hashmap: HashMap<SpatialBinCoord, ParticleData>,
     /// An instance of a `SpatialBin` that manages an efficient representation of the particles.
     pub spatial_bin: SpatialBin,
+    /// Total number of particles simulated in this frame. This will normally be much smaller than
+    /// the total number of particles that we have a record of.
+    pub particles_in_frame_count: u32,
     /// The list of cells that are currently in the GPU and need to be read back into the store.
     /// This is needed because the user may change the viewport at any time, perhaps multiple times
     /// before the next frame is run. And the GPU only returns indices relative to the frame, not
@@ -43,6 +44,7 @@ impl ParticleStore {
         Self {
             spatial_bin,
             hashmap: HashMap::new(),
+            particles_in_frame_count: 0,
             cells_to_read_from_gpu: Vec::default(),
         }
     }
@@ -68,33 +70,34 @@ impl ParticleStore {
 
     /// Create an efficient spatial representation of all the currently active particles in and
     /// around the viewport.
-    pub fn create_packed_data(&self) -> PackedData {
-        self.spatial_bin.create_packed_data(self)
+    pub fn create_packed_data(&mut self) -> PackedData {
+        let data = self.spatial_bin.create_packed_data(self);
+
+        // TODO: move this to `update_from_gpu` once GPU prefix sum is fully working.
+        #[allow(clippy::expect_used)]
+        {
+            self.particles_in_frame_count = data
+                .positions
+                .len()
+                .try_into()
+                .expect("More particles than fit into u32");
+        };
+
+        data
     }
 
+    // TODO:
+    //   - Save GPU data to CPU memory and disk.
+    //   - Probably use Persist with https://github.com/cberner/redb
     /// Take `PackedData` from the GPU and write back into the store.
-    pub fn update_from_gpu(&mut self, update: &PackedData) {
-        // TODO: Once we have prefix sum working on the GPU
-        // for (i, cell) in self.cells_to_read_from_gpu.iter().enumerate() {
-        //     let particles_begin_at = update.indices[i];
-        //     let marker = update.indices[i + 1];
-        //     let particles_count = particles
-        //     let particles
-        // }
-
-        // bevy::prelude::error!("{:?}", update.positions.len());
-
-        // Temp hacks
-        self.hashmap = HashMap::new();
-        #[allow(clippy::indexing_slicing)]
-        for i in 0..10 {
-            let particle = Particle {
-                position: update.positions[i],
-                velocity: update.velocities[i],
-            };
-            self.add_particle(particle);
-        }
-    }
+    // pub fn update_from_gpu(&mut self, update: &PackedData) {
+    // TODO: Once we have prefix sum working on the GPU
+    // for (i, cell) in self.cells_to_read_from_gpu.iter().enumerate() {
+    //     let particles_begin_at = update.indices[i];
+    //     let marker = update.indices[i + 1];
+    //     let particles_count = particles
+    //     let particles
+    // }
 
     /// Calculate the maximum number of particles involved in a single frame. Equal to
     /// those that can be seen from the viewport and those that make up a border of spatial bin
@@ -107,7 +110,7 @@ impl ParticleStore {
         //   See: https://github.com/AnthonyTornetta/bevy_easy_compute/issues/14
         let extra_percent = 10;
 
-        let cells = self.spatial_bin.get_active_cells();
+        let (cells, _grid) = self.spatial_bin.get_active_cells();
         #[allow(clippy::expect_used)]
         let total_cells: u32 = cells
             .len()
@@ -132,12 +135,22 @@ mod tests {
     fn creating_packed_data_for_one_particle_in_middle() {
         let mut store = ParticleStore::new(3, Vec4::new(0.0, 0.0, 6.0, 6.0));
         let particle = Particle {
-            position: Vec2::new(3.0, 3.0),
+            position: Vec2::new(4.5, 4.5),
             velocity: Vec2::new(1.1, 2.3),
         };
         store.add_particle(particle);
         let data = store.create_packed_data();
-        assert_eq!(data.indices, vec![0, 0, 0, 0, 0, 1, 1, 1, 1, 1]);
+
+        #[rustfmt::skip]
+        assert_eq!(
+            data.indices,
+            vec![
+            0,  0, 0, 0,
+                0, 0, 1,
+                1, 1, 1,  1
+            ]
+        );
+
         assert_eq!(data.positions, vec![particle.position]);
         assert_eq!(data.velocities, vec![particle.velocity]);
     }
@@ -153,7 +166,7 @@ mod tests {
         store.add_particle(particle);
         store.add_particle(particle);
         let data = store.create_packed_data();
-        assert_eq!(data.indices, vec![0, 0, 0, 0, 0, 3, 3, 3, 3, 3]);
+        assert_eq!(data.indices, vec![0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3]);
         assert_eq!(data.positions.len(), 3);
         assert_eq!(data.positions[1], particle.position);
         assert_eq!(data.velocities[1], particle.velocity);
@@ -182,7 +195,7 @@ mod tests {
         store.add_particle(particle3);
 
         let data = store.create_packed_data();
-        assert_eq!(data.indices, vec![0, 1, 1, 1, 1, 3, 3, 3, 3, 3]);
+        assert_eq!(data.indices, vec![0, 0, 1, 1, 1, 1, 3, 3, 3, 3, 3]);
         assert_eq!(data.positions.len(), 3);
         assert_eq!(data.positions[2], particle3.position);
         assert_eq!(data.velocities[1], particle2.velocity);
@@ -200,7 +213,7 @@ mod tests {
             velocity: Vec2::default(),
         });
         let data = store.create_packed_data();
-        assert_eq!(data.indices, vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+        assert_eq!(data.indices, vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
         assert_eq!(data.positions, vec![Vec2::new(6.1, 6.1)]);
         assert_eq!(data.velocities, vec![Vec2::default()]);
     }

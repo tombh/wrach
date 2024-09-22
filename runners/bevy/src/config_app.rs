@@ -22,6 +22,7 @@ impl Default for WrachConfig {
         Self {
             // 4:3
             dimensions: (480, 352),
+            // dimensions: (240, 200),
             // Particles can leave the edges of the dimensions
             boundaries_as_dimensions: false,
             // Good performance on my Asahi, Apple M1, OpenGL machine

@@ -15,6 +15,11 @@
 - https://github.com/PavelDoGreat/WebGL-Fluid-Simulation
   - https://github.com/PavelDoGreat/WebGL-Fluid-Simulation/blob/master/script.js
 
+## Prefix Sum
+
+- https://github.com/kishimisu/WebGPU-Radix-Sort/blob/main/src/shaders/prefix_sum.js
+- https://github.com/chronicl/particle_life/blob/d4e3482d73bffd15a04474a7cec54b1d31a15736/assets/prefix_sum.wgsl
+
 ## Ray Marching
 
 - https://blog.maximeheckel.com/posts/painting-with-math-a-gentle-study-of-raymarching/

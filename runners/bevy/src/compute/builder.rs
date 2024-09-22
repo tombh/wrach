@@ -1,0 +1,101 @@
+//! The code that manages the GPU compute workers
+
+use bevy::prelude::*;
+use bevy_easy_compute::prelude::*;
+
+use crate::{config_shader::ShaderWorldSettings, WrachState};
+
+/// The main GPU compute pipeline for physics simulations
+#[derive(Resource)]
+pub struct PhysicsComputeWorker;
+
+impl PhysicsComputeWorker {
+    /// Config data for the simulation
+    pub const WORLD_SETTINGS_UNIFORM: &'static str = "world_config";
+    /// Efficient packing of particle indices and spatial bin cell counts
+    pub const INDICES_BUFFER: &'static str = "indices_in";
+    /// A scratch buffer for prefix sum calculations
+    pub const INDICES_BUFFER_BLOCK_SUMS: &'static str = "indices_block_sums";
+    /// Pixel positions buffer ID for reading
+    pub const POSITIONS_BUFFER_IN: &'static str = "positions_in";
+    /// Pixel positions buffer ID for writing
+    pub const POSITIONS_BUFFER_OUT: &'static str = "positions_out";
+    /// Pixel velocities buffer ID for reading
+    pub const VELOCITIES_BUFFER_IN: &'static str = "velocities_in";
+    /// Pixel velocities buffer ID for writing
+    pub const VELOCITIES_BUFFER_OUT: &'static str = "velocities_out";
+
+    /// The size of the local shader workgroups for particle-related shaders. This is basically the
+    /// number of threads that a single workgroup invocation will run. Apparently Nvidia has 32-width
+    /// workgroups and AMD has 64, so I think a multiple of 64 is best to get full occupancy?
+    pub const PARTICLE_WORKGROUP_LOCAL_SIZE: u32 = 64;
+}
+
+impl ComputeWorker for PhysicsComputeWorker {
+    fn build(world: &mut World) -> AppComputeWorker<Self> {
+        let mut state = world.resource_mut::<WrachState>();
+
+        let (cells, _grid) = state.particle_store.spatial_bin.get_active_cells();
+        #[allow(clippy::arithmetic_side_effects)]
+        let total_cells_usize =
+            cells.len() + Self::PREFIX_SUM_GUARD_ITEM + Self::PREFIX_SUM_OFFSET_HACK;
+        #[allow(clippy::expect_used)]
+        let total_cells: u32 = total_cells_usize
+            .try_into()
+            // Wow, imagine if we're simulating that many cells!
+            .expect("Couldn't convert total cells count into u32");
+
+        assert!(
+            total_cells < Self::MAX_CELLS_FOR_PREFIX_SUM_PIPELINE,
+            "More cells than our current 2-pass prefix sum pipeline can handle"
+        );
+
+        debug!("Total spatial bins cells: {:?}", total_cells);
+
+        let max_particles = state.particle_store.max_particles_per_frame();
+        #[allow(clippy::expect_used)]
+        let max_particles_usize: usize = max_particles
+            .try_into()
+            .expect("Couldn't convert `max_particles` to `Vec` capacity");
+
+        let indices = vec![0_u32; total_cells_usize];
+
+        let positions = vec![Vec2::default(); max_particles_usize];
+        let velocities = vec![Vec2::default(); max_particles_usize];
+
+        let shader_settings = ShaderWorldSettings {
+            #[allow(clippy::cast_precision_loss)]
+            #[allow(clippy::as_conversions)]
+            view_dimensions: Vec2::new(
+                state.config.dimensions.0.into(),
+                state.config.dimensions.1.into(),
+            ),
+            view_anchor: Vec2::new(0.0, 0.0),
+            grid_dimensions: state.particle_store.spatial_bin.grid_dimensions,
+            cell_size: state.config.cell_size.into(),
+            particles_in_frame_count: 0,
+        };
+        state.shader_settings = shader_settings;
+
+        info!("{:?}", shader_settings);
+
+        let mut builder = AppComputeWorkerBuilder::new(world);
+        builder
+            .add_uniform(Self::WORLD_SETTINGS_UNIFORM, &shader_settings)
+            // GPU-only
+            .add_storage(Self::INDICES_BUFFER_BLOCK_SUMS, &indices)
+            .add_storage(Self::POSITIONS_BUFFER_OUT, &positions)
+            .add_storage(Self::VELOCITIES_BUFFER_OUT, &velocities)
+            // Readable from the CPU
+            .add_staging(Self::INDICES_BUFFER, &indices)
+            .add_staging(Self::POSITIONS_BUFFER_IN, &positions)
+            .add_staging(Self::VELOCITIES_BUFFER_IN, &velocities);
+
+        builder = Self::integration(builder, total_cells);
+        builder = Self::particles_per_cell_count(builder, max_particles);
+        builder = Self::prefix_sum(builder, total_cells);
+        builder = Self::particle_data(builder, max_particles);
+
+        builder.build()
+    }
+}

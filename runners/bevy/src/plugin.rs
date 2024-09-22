@@ -2,7 +2,10 @@
 use bevy::{asset::embedded_asset, prelude::*};
 use bevy_easy_compute::prelude::*;
 
-use crate::{compute::PhysicsComputeWorker, spatial_bin::PackedData, WrachConfig, WrachState};
+use crate::{
+    compute::PhysicsComputeWorker, spatial_bin::PackedData, state::GPUUpload, WrachConfig,
+    WrachState,
+};
 
 /// The Wrach Bevy Plugin
 #[allow(clippy::exhaustive_structs)]
@@ -26,7 +29,21 @@ impl Plugin for WrachPlugin {
     fn build(&self, app: &mut App) {
         embedded_asset!(app, "../../../assets/shaders/wrach_physics.spv");
 
-        app.insert_resource(WrachState::new(self.config))
+        embedded_asset!(app, "../../../assets/shaders/types.wgsl");
+        embedded_asset!(app, "../../../assets/shaders/particles_per_cell.wgsl");
+        embedded_asset!(app, "../../../assets/shaders/prefix_sum.wgsl");
+        embedded_asset!(app, "../../../assets/shaders/pack_new_particle_data.wgsl");
+
+        let mut state = WrachState::new(self.config);
+
+        let types_shader_handle: Option<Handle<Shader>> = Some(
+            app.world()
+                .resource::<AssetServer>()
+                .load("embedded://wrach_bevy/../../../assets/shaders/types.wgsl"),
+        );
+        state.types_shader_handle = types_shader_handle;
+
+        app.insert_resource(state)
             .add_plugins(AppComputePlugin)
             .add_plugins(AppComputeWorkerPlugin::<PhysicsComputeWorker>::default())
             .add_systems(PreUpdate, maybe_upload_to_gpu)
@@ -47,28 +64,36 @@ fn maybe_upload_to_gpu(
         return;
     }
 
-    for uploads in &wrach_state.gpu_uploads {
-        if !uploads.indices.is_empty() {
-            // error!("{:?}", uploads.indices);
-            compute_worker.write_slice(PhysicsComputeWorker::INDICES_BUFFER_IN, &uploads.indices);
-        }
+    for upload in &wrach_state.gpu_uploads {
+        match *upload {
+            // I don't understand the `ref` keyword. `&` gives a "mismatched types" error.
+            #[allow(clippy::ref_patterns)]
+            GPUUpload::PackedData(ref data) => {
+                debug!("Uploading packed data");
 
-        if !uploads.positions.is_empty() {
-            compute_worker.write_slice(
-                PhysicsComputeWorker::POSITIONS_BUFFER_IN,
-                &uploads.positions,
-            );
-        }
+                if !data.indices.is_empty() {
+                    compute_worker.write_slice(PhysicsComputeWorker::INDICES_BUFFER, &data.indices);
+                }
 
-        if !uploads.velocities.is_empty() {
-            compute_worker.write_slice(
-                PhysicsComputeWorker::VELOCITIES_BUFFER_IN,
-                &uploads.velocities,
-            );
+                if !data.positions.is_empty() {
+                    compute_worker
+                        .write_slice(PhysicsComputeWorker::POSITIONS_BUFFER_IN, &data.positions);
+                }
+
+                if !data.velocities.is_empty() {
+                    compute_worker
+                        .write_slice(PhysicsComputeWorker::VELOCITIES_BUFFER_IN, &data.velocities);
+                }
+            }
+
+            GPUUpload::Settings(settings) => {
+                debug!("Uploading settings: {:?}", settings);
+                compute_worker.write(PhysicsComputeWorker::WORLD_SETTINGS_UNIFORM, &settings);
+            }
         }
     }
 
-    wrach_state.gpu_uploads = Vec::default();
+    wrach_state.gpu_uploads = Vec::new();
 }
 
 /// What to do for every frame/tick of the simulation
@@ -84,11 +109,12 @@ fn tick(
     };
 
     let update = PackedData {
-        indices: compute_worker.read_vec(PhysicsComputeWorker::INDICES_BUFFER_OUT),
-        positions: compute_worker.read_vec(PhysicsComputeWorker::POSITIONS_BUFFER_OUT),
-        velocities: compute_worker.read_vec(PhysicsComputeWorker::VELOCITIES_BUFFER_OUT),
+        indices: compute_worker.read_vec(PhysicsComputeWorker::INDICES_BUFFER),
+        positions: compute_worker.read_vec(PhysicsComputeWorker::POSITIONS_BUFFER_IN),
+        velocities: compute_worker.read_vec(PhysicsComputeWorker::VELOCITIES_BUFFER_IN),
     };
 
+    wrach_state.packed_data.indices.clone_from(&update.indices);
     wrach_state
         .packed_data
         .positions
@@ -97,8 +123,4 @@ fn tick(
         .packed_data
         .velocities
         .clone_from(&update.velocities);
-
-    wrach_state.particle_store.update_from_gpu(&update);
-    let upload = wrach_state.particle_store.create_packed_data();
-    wrach_state.gpu_upload(upload);
 }

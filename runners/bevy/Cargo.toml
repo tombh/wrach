@@ -7,10 +7,14 @@ edition = "2021"
 bevy = { workspace = true }
 wrach-physics-shaders = { path = "../../shaders/physics" }
 rand = "0.8.5"
+bytemuck = "1.18.0"
 
 # Remove "shader_format_spirv" feature when this issue is fixed:
 #   https://github.com/AnthonyTornetta/bevy_easy_compute/issues/7
 bevy_easy_compute = { git = "https://github.com/AnthonyTornetta/bevy_easy_compute", features = ["shader_format_spirv"] }
+
+[dev-dependencies]
+wrach-api = { path = "../api" }
 
 [lints]
 workspace = true

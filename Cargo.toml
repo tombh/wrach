@@ -92,6 +92,8 @@ multiple_crate_versions = { level = "allow", priority = 1 }
 float_arithmetic = { level = "allow", priority = 1 }
 separated_literal_suffix = { level = "allow", priority = 1 }
 module_name_repetitions = { level = "allow", priority = 1 }
+decimal_literal_representation = { level = "allow", priority = 1 }
+multiple_inherent_impl = { level = "allow", priority = 1 }
 
 # I'd like to set this to "warn", but it seems that it can't be disabled on a per-crate basis
 # See: https://github.com/rust-lang/rust-clippy/issues/7342

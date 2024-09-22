@@ -4615,7 +4615,9 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_easy_compute",
+ "bytemuck",
  "rand",
+ "wrach-api",
  "wrach-physics-shaders",
 ]
 

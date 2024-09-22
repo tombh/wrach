@@ -15,7 +15,7 @@ use bevy::{
 use rand::Rng;
 use wrach_bevy::{Particle, WrachPlugin, WrachState};
 
-const NUMBER_OF_PARTICLES: u32 = 10;
+const NUMBER_OF_PARTICLES: u32 = 10000;
 const SCALE: f32 = 3.0;
 
 fn main() {
@@ -38,7 +38,7 @@ fn main() {
         .add_plugins(LogDiagnosticsPlugin::default())
         .add_plugins(FrameTimeDiagnosticsPlugin)
         .add_plugins(wrach)
-        .add_systems(Startup, setup)
+        .add_systems(Startup, startup)
         .add_systems(PreUpdate, keyboard_events)
         .add_systems(PostUpdate, move_entities)
         .run();
@@ -47,7 +47,7 @@ fn main() {
 #[derive(Component)]
 struct PixelEntity(pub usize);
 
-fn setup(
+fn startup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,

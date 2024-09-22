@@ -6,15 +6,12 @@
 
 use bevy::prelude::PluginGroup;
 use bevy::{app::App, winit::WinitPlugin, DefaultPlugins};
-use wrach_bevy::{WrachPlugin, WrachState};
 
-pub use bevy::math::Vec2;
-pub use wrach_bevy::Particle;
-pub use wrach_bevy::WrachConfig;
+use crate::{Particle, WrachConfig, WrachPlugin, WrachState};
 
 /// Main struct for Wrach physics simulations
 #[non_exhaustive]
-pub struct WrachAPI {
+pub struct WrachTestAPI {
     /// An instance of a Bevy app, already setup for Wrach
     pub app: App,
     /// All the positions of the particles
@@ -23,7 +20,7 @@ pub struct WrachAPI {
     pub velocities: Vec<(f32, f32)>,
 }
 
-impl WrachAPI {
+impl WrachTestAPI {
     /// Instantiate
     #[must_use]
     #[inline]
@@ -84,41 +81,5 @@ impl WrachAPI {
     #[inline]
     pub fn get_simulation_state(&self) -> &WrachState {
         self.app.world().resource::<WrachState>()
-    }
-}
-
-#[allow(clippy::indexing_slicing)]
-#[allow(clippy::default_numeric_fallback)]
-#[cfg(test)]
-mod test {
-    use bevy::math::Vec2;
-
-    use super::*;
-
-    #[test]
-    fn test_api_returns_data() {
-        let mut wrach = WrachAPI::new(WrachConfig {
-            dimensions: (10, 10),
-            cell_size: 3,
-            ..Default::default()
-        });
-
-        let mut particles: Vec<Particle> = Vec::new();
-        for _ in 0..3 {
-            particles.push(Particle {
-                position: Vec2::new(5.0, 5.0),
-                velocity: Vec2::new(0.5, 0.5),
-            });
-        }
-        wrach.add_particles(particles);
-
-        for _ in 0..5 {
-            wrach.tick();
-        }
-
-        assert_eq!(wrach.positions.len(), 164);
-        assert_ne!(wrach.positions[0], (0.0, 0.0));
-        assert_eq!(wrach.velocities.len(), 164);
-        assert_ne!(wrach.velocities[0], (0.0, 0.0));
     }
 }

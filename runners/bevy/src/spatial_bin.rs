@@ -2,7 +2,7 @@
 //! [See:](https://matthias-research.github.io/pages/tenMinutePhysics/11-hashing.pdf)
 
 use crate::particle_store::{ParticleData, ParticleStore};
-use bevy::math::{IVec2, Vec2, Vec4, Vec4Swizzles};
+use bevy::math::{IVec2, UVec2, Vec2, Vec4, Vec4Swizzles};
 
 /// The coordinates of a cell in the Spatial Binning grid
 pub type SpatialBinCoord = IVec2;
@@ -11,11 +11,13 @@ pub type SpatialBinCoord = IVec2;
 pub struct SpatialBin {
     /// The size of an individual bin/cell in the spatial bin grid. A cell is a square.
     pub cell_size: u16,
+    /// The width and height of the grid of cells, where the unit is a single cell.
+    pub grid_dimensions: UVec2,
     /// Coordinates of the active view onto the simulation.
     pub viewport: Vec4,
 }
 
-/// An effcient data structure for searching particles.
+/// An efficient data structure for searching particles.
 #[derive(Default)]
 #[allow(clippy::exhaustive_structs)]
 pub struct PackedData {
@@ -33,11 +35,14 @@ pub struct PackedData {
 
 impl SpatialBin {
     /// Instantiate. `cell_size` is the size of a spatial bin.
-    pub const fn new(cell_size: u16, viewport: Vec4) -> Self {
-        Self {
+    pub fn new(cell_size: u16, viewport: Vec4) -> Self {
+        let mut spatial_bin = Self {
             cell_size,
             viewport,
-        }
+            grid_dimensions: UVec2::default(),
+        };
+        spatial_bin.update_grid_size();
+        spatial_bin
     }
 
     /// Given floating point coordinates find the spatial bin cell in which those coordinates lie.
@@ -56,30 +61,53 @@ impl SpatialBin {
 
     /// Calculate all the spatial bins currently visible, and required, for simulating a single
     /// frame.
-    pub fn get_active_cells(&self) -> Vec<SpatialBinCoord> {
+    pub fn get_active_cells(&self) -> (Vec<SpatialBinCoord>, UVec2) {
         let mut cells: Vec<SpatialBinCoord> = Vec::new();
+        let mut grid_dimensions = UVec2::default();
 
         let bottom_left = self.get_cell_coord(self.viewport.xy());
         let top_right = self.get_cell_coord(self.viewport.zw());
+        #[allow(clippy::arithmetic_side_effects)]
         for y in bottom_left.y..=top_right.y {
+            grid_dimensions.y += 1_u32;
             for x in bottom_left.x..=top_right.x {
+                if y == top_right.y {
+                    grid_dimensions.x += 1_u32;
+                }
                 cells.push(SpatialBinCoord::new(x, y));
             }
         }
-        cells
+
+        (cells, grid_dimensions)
+    }
+
+    /// Update the dimensions of the spatial bin grid. The unit is a cell.
+    fn update_grid_size(&mut self) {
+        let (_cell_list, dimensions) = self.get_active_cells();
+        self.grid_dimensions = dimensions;
     }
 
     /// Create an efficient spatial representation of all the currently active particles in and
-    /// around the viewpoort.
+    /// around the viewport.
     pub fn create_packed_data(&self, store: &ParticleStore) -> PackedData {
-        let cells = self.get_active_cells();
+        let (cells, _grid) = self.get_active_cells();
         let mut indices: Vec<u32> = Vec::new();
         let mut positions: Vec<Vec2> = Vec::new();
         let mut velocities: Vec<Vec2> = Vec::new();
         let mut current_index = 0;
         let empty_cell = ParticleData::default();
 
+        // Always start with an extra zero at the beginning for 2 reasons:
+        //   1. The first index should always point to the beginning of the packed data.
+        //   2. There needs to be one more item in the indices array than there are particles so
+        //      that the last cell can look to one more item in the array to get its count of
+        //      particles.
         indices.push(current_index);
+
+        // And then add another zero at the beginning because our current GPU prefix sum
+        // implementation shifts all its items one to the right.
+        indices.push(current_index);
+
         for cell in cells {
             let particles = store.hashmap.get(&cell).unwrap_or(&empty_cell);
 
@@ -94,7 +122,6 @@ impl SpatialBin {
             {
                 current_index += particle_count;
             };
-
             indices.push(current_index);
 
             positions.extend(particles.positions.clone());
@@ -114,9 +141,37 @@ mod test {
     use super::*;
 
     #[test]
+    fn calculating_a_cell_coord_in_the_middle() {
+        let spatial_bin = SpatialBin::new(3, Vec4::new(0.0, 0.0, 6.0, 6.0));
+        let coord = spatial_bin.get_cell_coord(Vec2::new(3.0, 3.0));
+        assert_eq!(coord, SpatialBinCoord::new(1, 1));
+    }
+
+    #[test]
+    fn calculating_a_cell_coord_in_the_origin_cell() {
+        let spatial_bin = SpatialBin::new(3, Vec4::new(0.0, 0.0, 6.0, 6.0));
+        let coord = spatial_bin.get_cell_coord(Vec2::new(0.1, 0.1));
+        assert_eq!(coord, SpatialBinCoord::new(0, 0));
+    }
+
+    #[test]
+    fn calculating_a_cell_coord_in_the_top_right() {
+        let spatial_bin = SpatialBin::new(3, Vec4::new(0.0, 0.0, 6.0, 6.0));
+        let coord = spatial_bin.get_cell_coord(Vec2::new(6.5, 6.5));
+        assert_eq!(coord, SpatialBinCoord::new(2, 2));
+    }
+
+    #[test]
+    fn calculating_a_negative_cell_coord() {
+        let spatial_bin = SpatialBin::new(3, Vec4::new(0.0, 0.0, -6.0, -6.0));
+        let coord = spatial_bin.get_cell_coord(Vec2::new(-3.0, -3.0));
+        assert_eq!(coord, SpatialBinCoord::new(-1, -1));
+    }
+
+    #[test]
     fn calculating_active_cells_at_origin() {
         let spatial_bin = SpatialBin::new(6, Vec4::new(0.0, 0.0, 10.0, 10.0));
-        let cells = spatial_bin.get_active_cells();
+        let (cells, grid) = spatial_bin.get_active_cells();
         assert_eq!(
             cells,
             vec![
@@ -126,12 +181,33 @@ mod test {
                 SpatialBinCoord::new(1, 1)
             ]
         );
+
+        assert_eq!(grid, UVec2::new(2, 2));
+    }
+
+    #[test]
+    fn calculating_grid_for_rectangle_viewport() {
+        let spatial_bin = SpatialBin::new(6, Vec4::new(0.0, 0.0, 15.0, 10.0));
+        let (cells, grid) = spatial_bin.get_active_cells();
+        assert_eq!(
+            cells,
+            vec![
+                SpatialBinCoord::new(0, 0),
+                SpatialBinCoord::new(1, 0),
+                SpatialBinCoord::new(2, 0),
+                SpatialBinCoord::new(0, 1),
+                SpatialBinCoord::new(1, 1),
+                SpatialBinCoord::new(2, 1),
+            ]
+        );
+
+        assert_eq!(grid, UVec2::new(3, 2));
     }
 
     #[test]
     fn calculating_active_cells_where_viewport_offsets_cells() {
         let spatial_bin = SpatialBin::new(6, Vec4::new(3.3, 3.3, 9.0, 9.0));
-        let cells = spatial_bin.get_active_cells();
+        let (cells, _grid) = spatial_bin.get_active_cells();
         assert_eq!(
             cells,
             vec![
@@ -146,7 +222,7 @@ mod test {
     #[test]
     fn calculating_active_cells_with_negative_viewport() {
         let spatial_bin = SpatialBin::new(6, Vec4::new(-5.0, -5.0, 0.0, 0.0));
-        let cells = spatial_bin.get_active_cells();
+        let (cells, _grid) = spatial_bin.get_active_cells();
         assert_eq!(
             cells,
             vec![

@@ -1,8 +1,11 @@
 //! Integrate
 
-use spirv_std::{arch::IndexUnchecked, glam::Vec2};
+use spirv_std::{
+    arch::IndexUnchecked,
+    glam::{UVec2, Vec2},
+};
 
-use crate::particle::Particle;
+use crate::{particle::Particle, PREFIX_SUM_HACK};
 
 // TODO: I tried to make this struct shareable with the main app but get an error from `encase`
 // saying that Bevy's `Vec2` doesn't implement `ShaderSized`.
@@ -22,43 +25,72 @@ use crate::particle::Particle;
 // )]
 // #[repr(C)]
 /// Config needed by the simulation
-pub struct WorldConfig {
+pub struct WorldSettings {
     /// Dimensions of the view onto the simulation
     pub view_dimensions: Vec2,
-    /// Current position of the viewport. Measured from the bottom-left corner
+    /// Current position of the viewoport. Measured from the bottom-left corner
     pub view_anchor: Vec2,
+    /// The dimensions of the spatial bin grid, the unit is a cell
+    pub grid_dimensions: UVec2,
+    /// The size of a spatial bin cell
+    pub cell_size: u32,
+    /// Total number of particles simulated in this frame. This will normally be much smaller than
+    /// the total number of particles that we have a record of.
+    pub particles_in_frame_count: u32,
 }
 
 /// Integrate
 pub fn main(
     cell_index: usize,
-    world_config: &WorldConfig,
-    indices_input: &[u32],
-    indices_output: &mut [u32],
+    settings: &WorldSettings,
+    indices: &mut [u32],
     positions_input: &[Vec2],
     positions_output: &mut [Vec2],
     velocities_input: &[Vec2],
     velocities_output: &mut [Vec2],
 ) {
-    let (particles_start_at, particles_end_at) =
-        get_start_end_indices_for_particles(indices_input, cell_index);
-
-    for particle_index in particles_start_at..=particles_end_at {
-        let mut particle =
-            Particle::new(particle_index as usize, positions_input, velocities_input);
-
-        particle.integrate();
-        particle.enforce_limits(world_config);
-        particle.write(positions_output, velocities_output);
+    let total_cells = settings.grid_dimensions.x * settings.grid_dimensions.y + PREFIX_SUM_HACK;
+    if cell_index >= total_cells as usize {
+        return;
     }
 
-    // TODO: hack to prevent the argument being compiled away
-    indices_output[cell_index] = 0;
+    let (particles_start_at, particles_end_at) =
+        get_start_end_indices_for_particles_in_cell(indices, cell_index);
+
+    if particles_end_at > particles_start_at {
+        for particle_index in particles_start_at..=particles_end_at {
+            let mut particle =
+                Particle::new(particle_index as usize, positions_input, velocities_input);
+
+            particle.integrate();
+            particle.enforce_limits(settings);
+            particle.write(positions_output, velocities_output);
+        }
+    }
+
+    clear_indices_cell_for_next_frame(indices, cell_index);
+
+    // This is normal, it's not because of our prefix off by one issue. It's needed because
+    // of the "guard item" at the end of the prefix sum.
+    if cell_index == total_cells as usize - 1 {
+        clear_indices_cell_for_next_frame(indices, cell_index + 1);
+    }
+}
+
+/// Clear the current value for this cell's index pointer in the indices buffer. Considering we are
+/// already in the cell we save having a whole other shader and GPU pass.
+fn clear_indices_cell_for_next_frame(indices: &mut [u32], cell_index: usize) {
+    // SAFETY: We rely on the rest of the pipeline for correct index values.
+    let cell_reference = unsafe { indices.index_unchecked_mut(cell_index) };
+    *cell_reference = 0;
 }
 
 /// Based on the data structure for spatial binning, get the indices of where the first and last
 /// particles of the current cell are.
-fn get_start_end_indices_for_particles(indices_input: &[u32], cell_index: usize) -> (u32, u32) {
+fn get_start_end_indices_for_particles_in_cell(
+    indices_input: &[u32],
+    cell_index: usize,
+) -> (u32, u32) {
     // SAFETY:
     //   Getting data with bounds checks is obviously undefined behaviour. We rely on the
     //   rest of the pipeline to ensure that indices are always within limits.
