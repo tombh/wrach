@@ -1,11 +1,14 @@
 //! Setup the Wrach Bevy plugin
+
 use bevy::{asset::embedded_asset, prelude::*};
 use bevy_easy_compute::prelude::*;
 
 use crate::{
-    compute::PhysicsComputeWorker, spatial_bin::PackedData, state::GPUUpload, WrachConfig,
-    WrachState,
+    compute::PhysicsComputeWorker, plugin::bind_groups::get_buffers_for_renderer,
+    spatial_bin::PackedData, state::GPUUpload, WrachConfig, WrachState,
 };
+
+use super::bind_groups::ParticleBindGroupLayout;
 
 /// The Wrach Bevy Plugin
 #[allow(clippy::exhaustive_structs)]
@@ -27,28 +30,42 @@ impl Default for WrachPlugin {
 impl Plugin for WrachPlugin {
     #[inline]
     fn build(&self, app: &mut App) {
-        embedded_asset!(app, "../../../assets/shaders/wrach_physics.spv");
-
-        embedded_asset!(app, "../../../assets/shaders/types.wgsl");
-        embedded_asset!(app, "../../../assets/shaders/particles_per_cell.wgsl");
-        embedded_asset!(app, "../../../assets/shaders/prefix_sum.wgsl");
-        embedded_asset!(app, "../../../assets/shaders/pack_new_particle_data.wgsl");
+        embed_shaders(app);
 
         let mut state = WrachState::new(self.config);
 
         let types_shader_handle: Option<Handle<Shader>> = Some(
             app.world()
                 .resource::<AssetServer>()
-                .load("embedded://wrach_bevy/../../../assets/shaders/types.wgsl"),
+                .load("embedded://wrach_bevy/plugin/../../../../assets/shaders/types.wgsl"),
         );
         state.types_shader_handle = types_shader_handle;
 
         app.insert_resource(state)
             .add_plugins(AppComputePlugin)
             .add_plugins(AppComputeWorkerPlugin::<PhysicsComputeWorker>::default())
+            .add_systems(Startup, get_buffers_for_renderer)
             .add_systems(PreUpdate, maybe_upload_to_gpu)
             .add_systems(Update, tick);
     }
+
+    #[inline]
+    fn finish(&self, app: &mut App) {
+        app.init_resource::<ParticleBindGroupLayout>();
+    }
+}
+
+/// Embed the shaders into the binary itself
+fn embed_shaders(app: &mut App) {
+    embedded_asset!(app, "../../../../assets/shaders/wrach_physics.spv");
+    embedded_asset!(app, "../../../../assets/shaders/types.wgsl");
+    embedded_asset!(app, "../../../../assets/shaders/particles_per_cell.wgsl");
+    embedded_asset!(app, "../../../../assets/shaders/prefix_sum.wgsl");
+    embedded_asset!(
+        app,
+        "../../../../assets/shaders/pack_new_particle_data.wgsl"
+    );
+    embedded_asset!(app, "../../../../assets/shaders/render.wgsl");
 }
 
 /// Upload data to the GPU.

@@ -45,7 +45,7 @@ impl ParticlesPerCellCounterShader {
 #[allow(clippy::missing_trait_methods)]
 impl ComputeShader for ParticlesPerCellCounterShader {
     fn shader() -> ShaderRef {
-        "embedded://wrach_bevy/../../../assets/shaders/particles_per_cell.wgsl".into()
+        "embedded://wrach_bevy/plugin/../../../../assets/shaders/particles_per_cell.wgsl".into()
     }
 
     fn entry_point<'shader>() -> &'shader str {

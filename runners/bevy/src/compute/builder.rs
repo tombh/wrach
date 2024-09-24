@@ -1,6 +1,6 @@
 //! The code that manages the GPU compute workers
 
-use bevy::prelude::*;
+use bevy::{prelude::*, render::render_resource::BufferUsages};
 use bevy_easy_compute::prelude::*;
 
 use crate::{config_shader::ShaderWorldSettings, WrachState};
@@ -81,14 +81,18 @@ impl ComputeWorker for PhysicsComputeWorker {
 
         let mut builder = AppComputeWorkerBuilder::new(world);
         builder
+            .set_extra_buffer_usages(Some(BufferUsages::VERTEX))
             .add_uniform(Self::WORLD_SETTINGS_UNIFORM, &shader_settings)
+            .set_extra_buffer_usages(None)
             // GPU-only
             .add_storage(Self::INDICES_BUFFER_BLOCK_SUMS, &indices)
             .add_storage(Self::POSITIONS_BUFFER_OUT, &positions)
             .add_storage(Self::VELOCITIES_BUFFER_OUT, &velocities)
             // Readable from the CPU
             .add_staging(Self::INDICES_BUFFER, &indices)
+            .set_extra_buffer_usages(Some(BufferUsages::VERTEX))
             .add_staging(Self::POSITIONS_BUFFER_IN, &positions)
+            .set_extra_buffer_usages(None)
             .add_staging(Self::VELOCITIES_BUFFER_IN, &velocities);
 
         builder = Self::integration(builder, total_cells);

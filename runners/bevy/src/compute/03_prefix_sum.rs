@@ -101,7 +101,7 @@ impl PrefixSumShaderDownSweep {
 #[allow(clippy::missing_trait_methods)]
 impl ComputeShader for PrefixSumShaderDownSweep {
     fn shader() -> ShaderRef {
-        "embedded://wrach_bevy/../../../assets/shaders/prefix_sum.wgsl".into()
+        "embedded://wrach_bevy/plugin/../../../../assets/shaders/prefix_sum.wgsl".into()
     }
 
     fn entry_point<'shader>() -> &'shader str {
@@ -127,7 +127,7 @@ impl PrefixSumShaderBoxSums {
 #[allow(clippy::missing_trait_methods)]
 impl ComputeShader for PrefixSumShaderBoxSums {
     fn shader() -> ShaderRef {
-        "embedded://wrach_bevy/../../../assets/shaders/prefix_sum.wgsl".into()
+        "embedded://wrach_bevy/plugin/../../../../assets/shaders/prefix_sum.wgsl".into()
     }
 
     fn entry_point<'shader>() -> &'shader str {
@@ -201,7 +201,7 @@ mod test {
 
         assert_eq!(
             gpu_packed_data.indices, cpu_packed_data.indices,
-            "GPU packed indices does not match CPU packed indices"
+            "GPU packed indices do not match CPU packed indices"
         );
     }
 
@@ -254,7 +254,7 @@ mod test {
         assert_eq!(gpu_packed_data.indices.len(), cpu_packed_data.indices.len());
         assert_eq!(
             gpu_packed_data.indices, cpu_packed_data.indices,
-            "GPU packed indices does not match CPU packed indices"
+            "GPU packed indices do not match CPU packed indices"
         );
     }
 }

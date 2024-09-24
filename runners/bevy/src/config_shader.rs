@@ -3,13 +3,13 @@
 // The `ShaderType` derive seems to create code where the final field is duplicated
 #![allow(clippy::shadow_reuse)]
 
-use bevy::math::UVec2;
 use bevy::prelude::Vec2;
 use bevy::render::render_resource::ShaderType;
+use bevy::{math::UVec2, prelude::Resource};
 use bytemuck::{Pod, Zeroable};
 
 /// Config for the shader about the simulation world
-#[derive(ShaderType, Pod, Zeroable, Clone, Copy, Default, Debug)]
+#[derive(ShaderType, Resource, Pod, Zeroable, Clone, Copy, Default, Debug)]
 #[repr(C)]
 pub struct ShaderWorldSettings {
     /// Dimensions of the view onto the simulation

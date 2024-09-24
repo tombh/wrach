@@ -45,7 +45,7 @@ impl PackNewParticleDataShader {
 #[allow(clippy::missing_trait_methods)]
 impl ComputeShader for PackNewParticleDataShader {
     fn shader() -> ShaderRef {
-        "embedded://wrach_bevy/../../../assets/shaders/pack_new_particle_data.wgsl".into()
+        "embedded://wrach_bevy/plugin/../../../../assets/shaders/pack_new_particle_data.wgsl".into()
     }
 
     fn entry_point<'shader>() -> &'shader str {

@@ -27,12 +27,23 @@ mod compute {
 mod config_app;
 mod config_shader;
 mod particle_store;
-mod plugin;
+/// The Bevy Wrach plugin
+mod plugin {
+    pub mod bind_groups;
+    pub mod build;
+}
+/// Rendering code
+mod render {
+    pub mod draw_plugin;
+    mod graph_node;
+    mod pipeline;
+}
 mod spatial_bin;
 mod state;
 
 pub use crate::config_app::WrachConfig;
-pub use crate::plugin::WrachPlugin;
+pub use crate::plugin::build::WrachPlugin;
+pub use crate::render::draw_plugin::DrawPlugin;
 pub use crate::spatial_bin::PackedData;
 pub use crate::state::Particle;
 pub use crate::state::WrachState;
