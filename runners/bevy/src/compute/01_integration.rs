@@ -34,7 +34,7 @@ impl IntegrationShader {
     // TODO: Explain and explore workgroup sizes
     /// Calculate workgroup sizes
     const fn workgroups(total_cells: u32) -> [u32; 3] {
-        let partition = 1024;
+        let partition = 32;
         let main_workgroup_size = u32::div_ceil(total_cells, partition);
         [main_workgroup_size, 1, 1]
     }

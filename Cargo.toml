@@ -75,6 +75,7 @@ features = [
 
 [workspace.lints.rust]
 missing_docs = "warn"
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(target_arch, values("spirv"))'] }
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = 0 }

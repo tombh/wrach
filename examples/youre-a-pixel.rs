@@ -10,8 +10,8 @@ use bevy::window::WindowResolution;
 use rand::Rng;
 use wrach_bevy::{DrawPlugin, Particle, WrachPlugin, WrachState};
 
-const NUMBER_OF_PARTICLES: u32 = 20000;
-const SCALE: f32 = 5.0;
+const NUMBER_OF_PARTICLES: u32 = 125_000;
+const SCALE: f32 = 4.0;
 
 fn main() {
     let wrach = WrachPlugin::default();

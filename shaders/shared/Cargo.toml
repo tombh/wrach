@@ -1,14 +1,13 @@
 [package]
-name = "wrach-physics-shaders"
+name = "wrach-cpu-gpu-shared"
 version = "0.0.0"
 edition = "2021"
 
-[lib]
-crate-type = ["dylib"]
-
 [dependencies]
 spirv-std = { workspace = true }
-wrach-cpu-gpu-shared = { path = "../shared" }
+
+[target.'cfg(not(target_arch = "spirv"))'.dependencies]
+bevy = { workspace = true }
 
 [lints]
 workspace = true

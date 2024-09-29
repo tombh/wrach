@@ -4618,7 +4618,16 @@ dependencies = [
  "bytemuck",
  "rand",
  "wrach-api",
+ "wrach-cpu-gpu-shared",
  "wrach-physics-shaders",
+]
+
+[[package]]
+name = "wrach-cpu-gpu-shared"
+version = "0.0.0"
+dependencies = [
+ "bevy",
+ "spirv-std",
 ]
 
 [[package]]
@@ -4626,6 +4635,7 @@ name = "wrach-physics-shaders"
 version = "0.0.0"
 dependencies = [
  "spirv-std",
+ "wrach-cpu-gpu-shared",
 ]
 
 [[package]]

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 bevy = { workspace = true }
 wrach-physics-shaders = { path = "../../shaders/physics" }
+wrach-cpu-gpu-shared = { path = "../../shaders/shared" }
 rand = "0.8.5"
 bytemuck = "1.18.0"
 

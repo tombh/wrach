@@ -22,10 +22,11 @@ impl Default for WrachConfig {
         Self {
             // 4:3
             dimensions: (480, 352),
-            // Particles can leave the edges of the dimensions
+            // dimensions: (1480, 1052),
+            // Whether particles can leave the edges of the dimensions
             boundaries_as_dimensions: false,
             // Good performance on my Asahi, Apple M1, OpenGL machine
-            cell_size: 6,
+            cell_size: wrach_cpu_gpu_shared::SPATIAL_BIN_CELL_SIZE,
         }
     }
 }

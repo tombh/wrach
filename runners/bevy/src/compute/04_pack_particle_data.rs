@@ -67,7 +67,7 @@ mod test {
     use crate::WrachConfig;
 
     #[test]
-    fn prefix_sum_for_small_arrays() {
+    fn packed_data() {
         let dimensions = (10, 10);
         let cell_size = 3;
 
@@ -87,7 +87,7 @@ mod test {
                 velocity: Vec2::new(0.0, 0.0),
             },
             Particle {
-                position: Vec2::new(0.2, 0.2),
+                position: Vec2::new(2.5, 2.5),
                 velocity: Vec2::new(0.0, 0.0),
             },
             Particle {
@@ -105,7 +105,7 @@ mod test {
             store.add_particle(particle);
         }
 
-        for _ in 0..3 {
+        for _ in 0..4 {
             wrach.tick();
         }
 
@@ -116,7 +116,7 @@ mod test {
             cpu_packed_data.positions,
             vec![
                 Vec2::new(0.1, 0.1),
-                Vec2::new(0.2, 0.2),
+                Vec2::new(2.5, 2.5),
                 Vec2::new(5.0, 5.0),
                 Vec2::new(10.0, 10.0)
             ]
@@ -127,7 +127,7 @@ mod test {
         allow_random_order_in_cell[0..2].sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
         assert_eq!(
             allow_random_order_in_cell[0..2],
-            vec![Vec2::new(0.1, 0.1), Vec2::new(0.2, 0.2)]
+            vec![Vec2::new(0.1, 0.1), Vec2::new(2.5, 2.5)]
         );
 
         assert_eq!(

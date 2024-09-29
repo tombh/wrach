@@ -4,10 +4,10 @@ use spirv_std::{
     arch::IndexUnchecked,
     glam::{vec4, Vec2},
 };
-
-use crate::integrate::WorldSettings;
+use wrach_cpu_gpu_shared::WorldSettings;
 
 /// Convenient representation of a particle
+#[derive(Default, Copy, Clone)]
 pub struct Particle {
     /// Index of the particle
     pub index: usize,

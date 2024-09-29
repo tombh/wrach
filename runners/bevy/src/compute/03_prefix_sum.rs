@@ -149,7 +149,7 @@ mod test {
     #[test]
     fn prefix_sum_for_small_arrays() {
         let dimensions = (10, 10);
-        let cell_size = 3;
+        let cell_size = 5;
 
         let mut wrach = WrachTestAPI::new(WrachConfig {
             dimensions,
@@ -167,7 +167,7 @@ mod test {
                 velocity: Vec2::new(0.0, 0.0),
             },
             Particle {
-                position: Vec2::new(0.2, 0.2),
+                position: Vec2::new(2.0, 2.0),
                 velocity: Vec2::new(0.0, 0.0),
             },
             Particle {
@@ -185,7 +185,7 @@ mod test {
             store.add_particle(particle);
         }
 
-        for _ in 0..3 {
+        for _ in 0..4 {
             wrach.tick();
         }
 
@@ -194,7 +194,7 @@ mod test {
 
         assert_eq!(
             cpu_packed_data.indices,
-            vec![0, 0, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4]
+            vec![0, 0, 2, 2, 2, 2, 3, 3, 3, 3, 4]
         );
 
         //assert_eq!(gpu_packed_data.positions, cpu_packed_data.positions);
@@ -244,7 +244,7 @@ mod test {
             store.add_particle(particle);
         }
 
-        for _ in 0..3 {
+        for _ in 0..4 {
             wrach.tick();
         }
 

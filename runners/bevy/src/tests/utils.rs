@@ -10,7 +10,7 @@ use bevy::{app::App, winit::WinitPlugin, DefaultPlugins};
 use crate::{Particle, WrachConfig, WrachPlugin, WrachState};
 
 /// Main struct for Wrach physics simulations
-#[non_exhaustive]
+#[allow(clippy::exhaustive_structs)]
 pub struct WrachTestAPI {
     /// An instance of a Bevy app, already setup for Wrach
     pub app: App,

@@ -13,7 +13,7 @@ pub use wrach_bevy::Particle;
 pub use wrach_bevy::WrachConfig;
 
 /// Main struct for Wrach physics simulations
-#[non_exhaustive]
+#[allow(clippy::exhaustive_structs)]
 pub struct WrachAPI {
     /// An instance of a Bevy app, already setup for Wrach
     pub app: App,
