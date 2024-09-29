@@ -6,7 +6,7 @@
 use bevy::reflect::TypePath;
 use bevy_easy_compute::prelude::{AppComputeWorkerBuilder, ComputeShader, ShaderRef};
 
-use super::PhysicsComputeWorker;
+use super::{buffers::Buffers, PhysicsComputeWorker};
 
 impl PhysicsComputeWorker {
     /// Count the number of particles per cell
@@ -17,9 +17,9 @@ impl PhysicsComputeWorker {
         builder.add_pass::<ParticlesPerCellCounterShader>(
             ParticlesPerCellCounterShader::workgroups(total_particles),
             &[
-                Self::WORLD_SETTINGS_UNIFORM,
-                Self::POSITIONS_BUFFER_OUT,
-                Self::INDICES_BUFFER,
+                Buffers::WORLD_SETTINGS_UNIFORM,
+                Buffers::POSITIONS_OUT,
+                Buffers::INDICES_MAIN,
             ],
         );
         builder

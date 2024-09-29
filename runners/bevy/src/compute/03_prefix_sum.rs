@@ -19,7 +19,7 @@
 use bevy::reflect::TypePath;
 use bevy_easy_compute::prelude::{AppComputeWorkerBuilder, ComputeShader, ShaderRef};
 
-use super::PhysicsComputeWorker;
+use super::{buffers::Buffers, PhysicsComputeWorker};
 
 impl PhysicsComputeWorker {
     /// Our current prefix sum implementation only has 2 passes, we can easily add more passes, but I
@@ -51,9 +51,9 @@ impl PhysicsComputeWorker {
         builder.add_pass::<PrefixSumShaderDownSweep>(
             PrefixSumShaderDownSweep::workgroups(total_cells),
             &[
-                Self::WORLD_SETTINGS_UNIFORM,
-                Self::INDICES_BUFFER,
-                Self::INDICES_BUFFER_BLOCK_SUMS,
+                Buffers::WORLD_SETTINGS_UNIFORM,
+                Buffers::INDICES_MAIN,
+                Buffers::INDICES_BLOCK_SUMS,
             ],
         );
 
@@ -63,18 +63,18 @@ impl PhysicsComputeWorker {
                 .add_pass::<PrefixSumShaderDownSweep>(
                     PrefixSumShaderDownSweep::workgroups(remaining),
                     &[
-                        Self::WORLD_SETTINGS_UNIFORM,
+                        Buffers::WORLD_SETTINGS_UNIFORM,
                         // Note how, this time, the block sums are in place of the indices.
-                        Self::INDICES_BUFFER_BLOCK_SUMS,
-                        Self::INDICES_BUFFER_BLOCK_SUMS,
+                        Buffers::INDICES_BLOCK_SUMS,
+                        Buffers::INDICES_BLOCK_SUMS,
                     ],
                 )
                 .add_pass::<PrefixSumShaderBoxSums>(
                     PrefixSumShaderBoxSums::workgroups(total_cells),
                     &[
-                        Self::WORLD_SETTINGS_UNIFORM,
-                        Self::INDICES_BUFFER,
-                        Self::INDICES_BUFFER_BLOCK_SUMS,
+                        Buffers::WORLD_SETTINGS_UNIFORM,
+                        Buffers::INDICES_MAIN,
+                        Buffers::INDICES_BLOCK_SUMS,
                     ],
                 );
         };

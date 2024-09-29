@@ -17,7 +17,10 @@ use bevy::{
 };
 use bevy_easy_compute::prelude::*;
 
-use crate::{compute::PhysicsComputeWorker, config_shader::ShaderWorldSettings};
+use crate::{
+    compute::{buffers::Buffers, PhysicsComputeWorker},
+    config_shader::ShaderWorldSettings,
+};
 
 /// The bind group layout for the minimal data needed to render particle
 #[derive(Resource, ExtractResource, Clone)]
@@ -63,13 +66,13 @@ pub fn get_buffers_for_renderer(world: &mut World) {
             #[allow(clippy::expect_used)]
             compute_worker
                 .buffers
-                .get(PhysicsComputeWorker::WORLD_SETTINGS_UNIFORM)
+                .get(Buffers::WORLD_SETTINGS_UNIFORM)
                 .expect("Couldn't get world settings buffer")
                 .as_entire_binding(),
             #[allow(clippy::expect_used)]
             compute_worker
                 .buffers
-                .get(PhysicsComputeWorker::POSITIONS_BUFFER_IN)
+                .get(Buffers::POSITIONS_IN)
                 .expect("Couldn't get particle positions buffer")
                 .as_entire_binding(),
         )),

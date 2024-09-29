@@ -13,6 +13,7 @@ mod tests {
 /// All GPU-compute related code
 mod compute {
     pub use builder::PhysicsComputeWorker;
+    pub mod buffers;
     mod builder;
 
     #[path = "01_integration.rs"]

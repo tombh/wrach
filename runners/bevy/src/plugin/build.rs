@@ -4,8 +4,11 @@ use bevy::{asset::embedded_asset, prelude::*};
 use bevy_easy_compute::prelude::*;
 
 use crate::{
-    compute::PhysicsComputeWorker, plugin::bind_groups::get_buffers_for_renderer,
-    spatial_bin::PackedData, state::GPUUpload, WrachConfig, WrachState,
+    compute::{buffers::Buffers, PhysicsComputeWorker},
+    plugin::bind_groups::get_buffers_for_renderer,
+    spatial_bin::PackedData,
+    state::GPUUpload,
+    WrachConfig, WrachState,
 };
 
 use super::bind_groups::ParticleBindGroupLayout;
@@ -89,23 +92,21 @@ fn maybe_upload_to_gpu(
                 debug!("Uploading packed data");
 
                 if !data.indices.is_empty() {
-                    compute_worker.write_slice(PhysicsComputeWorker::INDICES_BUFFER, &data.indices);
+                    compute_worker.write_slice(Buffers::INDICES_MAIN, &data.indices);
                 }
 
                 if !data.positions.is_empty() {
-                    compute_worker
-                        .write_slice(PhysicsComputeWorker::POSITIONS_BUFFER_IN, &data.positions);
+                    compute_worker.write_slice(Buffers::POSITIONS_IN, &data.positions);
                 }
 
                 if !data.velocities.is_empty() {
-                    compute_worker
-                        .write_slice(PhysicsComputeWorker::VELOCITIES_BUFFER_IN, &data.velocities);
+                    compute_worker.write_slice(Buffers::VELOCITIES_IN, &data.velocities);
                 }
             }
 
             GPUUpload::Settings(settings) => {
                 debug!("Uploading settings: {:?}", settings);
-                compute_worker.write(PhysicsComputeWorker::WORLD_SETTINGS_UNIFORM, &settings);
+                compute_worker.write(Buffers::WORLD_SETTINGS_UNIFORM, &settings);
             }
         }
     }
@@ -126,9 +127,9 @@ fn tick(
     };
 
     let update = PackedData {
-        indices: compute_worker.read_vec(PhysicsComputeWorker::INDICES_BUFFER),
-        positions: compute_worker.read_vec(PhysicsComputeWorker::POSITIONS_BUFFER_IN),
-        velocities: compute_worker.read_vec(PhysicsComputeWorker::VELOCITIES_BUFFER_IN),
+        indices: compute_worker.read_vec(Buffers::INDICES_MAIN),
+        positions: compute_worker.read_vec(Buffers::POSITIONS_IN),
+        velocities: compute_worker.read_vec(Buffers::VELOCITIES_IN),
     };
 
     wrach_state.packed_data.indices.clone_from(&update.indices);

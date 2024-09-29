@@ -3,7 +3,7 @@
 use bevy::reflect::TypePath;
 use bevy_easy_compute::prelude::{AppComputeWorkerBuilder, ComputeShader, ShaderRef};
 
-use super::PhysicsComputeWorker;
+use super::{buffers::Buffers, PhysicsComputeWorker};
 
 impl PhysicsComputeWorker {
     /// Shader for integrating the physics results onto the movement of particles
@@ -14,12 +14,12 @@ impl PhysicsComputeWorker {
         builder.add_pass::<IntegrationShader>(
             IntegrationShader::workgroups(total_cells),
             &[
-                Self::WORLD_SETTINGS_UNIFORM,
-                Self::INDICES_BUFFER,
-                Self::POSITIONS_BUFFER_IN,
-                Self::POSITIONS_BUFFER_OUT,
-                Self::VELOCITIES_BUFFER_IN,
-                Self::VELOCITIES_BUFFER_OUT,
+                Buffers::WORLD_SETTINGS_UNIFORM,
+                Buffers::INDICES_MAIN,
+                Buffers::POSITIONS_IN,
+                Buffers::POSITIONS_OUT,
+                Buffers::VELOCITIES_IN,
+                Buffers::VELOCITIES_OUT,
             ],
         );
         builder
