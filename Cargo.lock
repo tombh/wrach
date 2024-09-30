@@ -4634,6 +4634,7 @@ dependencies = [
 name = "wrach-physics-shaders"
 version = "0.0.0"
 dependencies = [
+ "bevy",
  "spirv-std",
  "wrach-cpu-gpu-shared",
 ]

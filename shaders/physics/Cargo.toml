@@ -10,6 +10,9 @@ crate-type = ["dylib"]
 spirv-std = { workspace = true }
 wrach-cpu-gpu-shared = { path = "../shared" }
 
+[target.'cfg(not(target_arch = "spirv"))'.dependencies]
+bevy = { workspace = true }
+
 [lints]
 workspace = true
 

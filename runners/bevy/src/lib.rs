@@ -16,14 +16,17 @@ mod compute {
     pub mod buffers;
     mod builder;
 
-    #[path = "01_integration.rs"]
-    mod integration;
-    #[path = "04_pack_particle_data.rs"]
-    mod pack_particle_data;
-    #[path = "02_particles_cell_count.rs"]
+    #[path = "01_particles_cell_count.rs"]
     mod particles_cell_count;
-    #[path = "03_prefix_sum.rs"]
+
+    #[path = "02_prefix_sum.rs"]
     mod prefix_sum;
+
+    #[path = "03_pack_particle_data.rs"]
+    mod pack_particle_data;
+
+    #[path = "04_integration.rs"]
+    mod integration;
 }
 mod config_app;
 mod config_shader;

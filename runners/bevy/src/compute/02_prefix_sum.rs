@@ -38,21 +38,21 @@ impl PhysicsComputeWorker {
     /// And if the final cell has 1 particle, instead of: [0, 3, 3, 4], we do: [0, 3, 3, 4, 5].
     pub const PREFIX_SUM_GUARD_ITEM: usize = 1;
 
-    // TODO: Move to a shared CPU/GPU crate.
-    /// Our current GPU implementation of prefix sum, offsets all items one to the right. Hopefully
-    /// we'll move to a subgroup-based version soon that doesn't have this issue.
-    pub const PREFIX_SUM_OFFSET_HACK: usize = 1;
-
     /// Count the number of particles per cell
-    pub fn prefix_sum(
-        mut builder: AppComputeWorkerBuilder<Self>,
+    pub fn prefix_sum<'prefix_sum, DownSweep, BoxSums>(
+        mut builder: AppComputeWorkerBuilder<'prefix_sum, Self>,
+        indices_buffer: &'static str,
         total_cells: u32,
-    ) -> AppComputeWorkerBuilder<Self> {
-        builder.add_pass::<PrefixSumShaderDownSweep>(
-            PrefixSumShaderDownSweep::workgroups(total_cells),
+    ) -> AppComputeWorkerBuilder<'prefix_sum, Self>
+    where
+        DownSweep: ComputeShader,
+        BoxSums: ComputeShader,
+    {
+        builder.add_pass::<DownSweep>(
+            PrefixSumShaderDownSweepCommon::workgroups(total_cells),
             &[
                 Buffers::WORLD_SETTINGS_UNIFORM,
-                Buffers::INDICES_MAIN,
+                indices_buffer,
                 Buffers::INDICES_BLOCK_SUMS,
             ],
         );
@@ -60,8 +60,8 @@ impl PhysicsComputeWorker {
         let remaining = total_cells.div_ceil(Self::PREFIX_SUM_ITEMS_PER_WORKGROUP);
         if remaining > 1 {
             builder
-                .add_pass::<PrefixSumShaderDownSweep>(
-                    PrefixSumShaderDownSweep::workgroups(remaining),
+                .add_pass::<DownSweep>(
+                    PrefixSumShaderDownSweepCommon::workgroups(remaining),
                     &[
                         Buffers::WORLD_SETTINGS_UNIFORM,
                         // Note how, this time, the block sums are in place of the indices.
@@ -69,11 +69,11 @@ impl PhysicsComputeWorker {
                         Buffers::INDICES_BLOCK_SUMS,
                     ],
                 )
-                .add_pass::<PrefixSumShaderBoxSums>(
-                    PrefixSumShaderBoxSums::workgroups(total_cells),
+                .add_pass::<BoxSums>(
+                    PrefixSumShaderBoxSumsCommon::workgroups(total_cells),
                     &[
                         Buffers::WORLD_SETTINGS_UNIFORM,
-                        Buffers::INDICES_MAIN,
+                        indices_buffer,
                         Buffers::INDICES_BLOCK_SUMS,
                     ],
                 );
@@ -85,9 +85,9 @@ impl PhysicsComputeWorker {
 
 /// First stage of a 2-stage prefix sum algorithm.
 #[derive(TypePath)]
-struct PrefixSumShaderDownSweep;
+pub struct PrefixSumShaderDownSweepCommon;
 
-impl PrefixSumShaderDownSweep {
+impl PrefixSumShaderDownSweepCommon {
     /// Calculate workgroups
     const fn workgroups(total_cells: u32) -> [u32; 3] {
         let main_workgroup_size = u32::div_ceil(
@@ -98,22 +98,41 @@ impl PrefixSumShaderDownSweep {
     }
 }
 
+/// First stage of a 2-stage prefix sum algorithm.
+#[derive(TypePath)]
+pub struct PrefixSumShaderDownSweepMain;
+
 #[allow(clippy::missing_trait_methods)]
-impl ComputeShader for PrefixSumShaderDownSweep {
+impl ComputeShader for PrefixSumShaderDownSweepMain {
     fn shader() -> ShaderRef {
         "embedded://wrach_bevy/plugin/../../../../assets/shaders/prefix_sum.wgsl".into()
     }
 
     fn entry_point<'shader>() -> &'shader str {
-        "reduce_downsweep"
+        "reduce_downsweep_main"
+    }
+}
+
+/// First stage of a 2-stage prefix sum algorithm.
+#[derive(TypePath)]
+pub struct PrefixSumShaderDownSweepAux;
+
+#[allow(clippy::missing_trait_methods)]
+impl ComputeShader for PrefixSumShaderDownSweepAux {
+    fn shader() -> ShaderRef {
+        "embedded://wrach_bevy/plugin/../../../../assets/shaders/prefix_sum.wgsl".into()
+    }
+
+    fn entry_point<'shader>() -> &'shader str {
+        "reduce_downsweep_aux"
     }
 }
 
 /// Second stage of a 2-stage prefix sum algorithm.
 #[derive(TypePath)]
-struct PrefixSumShaderBoxSums;
+pub struct PrefixSumShaderBoxSumsCommon;
 
-impl PrefixSumShaderBoxSums {
+impl PrefixSumShaderBoxSumsCommon {
     /// Calculate workgroups
     const fn workgroups(total_cells: u32) -> [u32; 3] {
         let main_workgroup_size = u32::div_ceil(
@@ -124,14 +143,33 @@ impl PrefixSumShaderBoxSums {
     }
 }
 
+/// Second stage of a 2-stage prefix sum algorithm.
+#[derive(TypePath)]
+pub struct PrefixSumShaderBoxSumsMain;
+
 #[allow(clippy::missing_trait_methods)]
-impl ComputeShader for PrefixSumShaderBoxSums {
+impl ComputeShader for PrefixSumShaderBoxSumsMain {
     fn shader() -> ShaderRef {
         "embedded://wrach_bevy/plugin/../../../../assets/shaders/prefix_sum.wgsl".into()
     }
 
     fn entry_point<'shader>() -> &'shader str {
-        "add_block_sums"
+        "add_block_sums_main"
+    }
+}
+
+/// Second stage of a 2-stage prefix sum algorithm.
+#[derive(TypePath)]
+pub struct PrefixSumShaderBoxSumsAux;
+
+#[allow(clippy::missing_trait_methods)]
+impl ComputeShader for PrefixSumShaderBoxSumsAux {
+    fn shader() -> ShaderRef {
+        "embedded://wrach_bevy/plugin/../../../../assets/shaders/prefix_sum.wgsl".into()
+    }
+
+    fn entry_point<'shader>() -> &'shader str {
+        "add_block_sums_aux"
     }
 }
 
@@ -154,6 +192,7 @@ mod test {
         let mut wrach = WrachTestAPI::new(WrachConfig {
             dimensions,
             cell_size,
+            exclude_integration_pass: true,
             ..Default::default()
         });
         let mut store = ParticleStore::new(
@@ -185,9 +224,7 @@ mod test {
             store.add_particle(particle);
         }
 
-        for _ in 0..4 {
-            wrach.tick();
-        }
+        wrach.tick_until_first_data();
 
         let gpu_packed_data = &wrach.get_simulation_state().packed_data;
         let cpu_packed_data = store.create_packed_data();
@@ -196,8 +233,6 @@ mod test {
             cpu_packed_data.indices,
             vec![0, 0, 2, 2, 2, 2, 3, 3, 3, 3, 4]
         );
-
-        //assert_eq!(gpu_packed_data.positions, cpu_packed_data.positions);
 
         assert_eq!(
             gpu_packed_data.indices, cpu_packed_data.indices,
@@ -213,6 +248,7 @@ mod test {
         let mut wrach = WrachTestAPI::new(WrachConfig {
             dimensions,
             cell_size,
+            exclude_integration_pass: true,
             ..Default::default()
         });
         let mut store = ParticleStore::new(
@@ -244,9 +280,7 @@ mod test {
             store.add_particle(particle);
         }
 
-        for _ in 0..4 {
-            wrach.tick();
-        }
+        wrach.tick_until_first_data();
 
         let gpu_packed_data = &wrach.get_simulation_state().packed_data;
         let cpu_packed_data = store.create_packed_data();

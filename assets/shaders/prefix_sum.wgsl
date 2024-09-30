@@ -15,12 +15,31 @@ const WORKGROUP_MEMORY_SIZE: u32 = ITEMS_PER_WORKGROUP * 2;
 var<workgroup> temp: array<u32, WORKGROUP_MEMORY_SIZE>;
 
 @compute @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
-fn reduce_downsweep(
+fn reduce_downsweep_main(
     @builtin(workgroup_id) w_id: vec3<u32>,
     @builtin(num_workgroups) w_dim: vec3<u32>,
     @builtin(local_invocation_index) TID: u32, // Local thread ID
 ) {
     let TOTAL_ITEMS = (settings.grid_dimensions.x * settings.grid_dimensions.y) + 2;
+    reduce_downsweep(w_id, w_dim, TID, TOTAL_ITEMS);
+}
+
+@compute @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
+fn reduce_downsweep_aux(
+    @builtin(workgroup_id) w_id: vec3<u32>,
+    @builtin(num_workgroups) w_dim: vec3<u32>,
+    @builtin(local_invocation_index) TID: u32, // Local thread ID
+) {
+    let TOTAL_ITEMS = ((settings.grid_dimensions.x + 1) * (settings.grid_dimensions.y + 1)) + 2;
+    reduce_downsweep(w_id, w_dim, TID, TOTAL_ITEMS);
+}
+
+fn reduce_downsweep(
+    w_id: vec3<u32>,
+    w_dim: vec3<u32>,
+    TID: u32,
+    TOTAL_ITEMS: u32
+) {
     let WORKGROUP_ID = w_id.x + w_id.y * w_dim.x;
     let WID = WORKGROUP_ID * THREADS_PER_WORKGROUP;
     let GID = WID + TID; // Global thread ID
@@ -94,21 +113,39 @@ fn reduce_downsweep(
     items[final_index + 1] = temp[ELM_TID + 1];
 }
 
+
+
 @compute @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
-fn add_block_sums(
+fn add_block_sums_main(
     @builtin(workgroup_id) w_id: vec3<u32>,
     @builtin(num_workgroups) w_dim: vec3<u32>,
     @builtin(local_invocation_index) TID: u32, // Local thread ID
 ) {
     let TOTAL_ITEMS = (settings.grid_dimensions.x * settings.grid_dimensions.y) + 2;
+    add_block_sums(w_id, w_dim, TID, TOTAL_ITEMS);
+}
+
+@compute @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
+fn add_block_sums_aux(
+    @builtin(workgroup_id) w_id: vec3<u32>,
+    @builtin(num_workgroups) w_dim: vec3<u32>,
+    @builtin(local_invocation_index) TID: u32,
+) {
+    let TOTAL_ITEMS = ((settings.grid_dimensions.x + 1) * (settings.grid_dimensions.y + 1)) + 2;
+    add_block_sums(w_id, w_dim, TID, TOTAL_ITEMS);
+}
+
+fn add_block_sums(
+    w_id: vec3<u32>,
+    w_dim: vec3<u32>,
+    TID: u32,
+    TOTAL_ITEMS: u32,
+) {
     let WORKGROUP_ID = w_id.x + w_id.y * w_dim.x;
     let WID = WORKGROUP_ID * THREADS_PER_WORKGROUP;
     let GID = WID + TID; // Global thread ID
 
     let ELM_ID = GID * 2;
-
-    // @tombh: ...
-    // let final_index = ELM_ID - 1;
 
     if ELM_ID >= TOTAL_ITEMS {
         return;

@@ -91,16 +91,12 @@ fn maybe_upload_to_gpu(
             GPUUpload::PackedData(ref data) => {
                 debug!("Uploading packed data");
 
-                if !data.indices.is_empty() {
-                    compute_worker.write_slice(Buffers::INDICES_MAIN, &data.indices);
-                }
-
                 if !data.positions.is_empty() {
-                    compute_worker.write_slice(Buffers::POSITIONS_IN, &data.positions);
+                    compute_worker.write_slice(Buffers::POSITIONS_OUT, &data.positions);
                 }
 
                 if !data.velocities.is_empty() {
-                    compute_worker.write_slice(Buffers::VELOCITIES_IN, &data.velocities);
+                    compute_worker.write_slice(Buffers::VELOCITIES_OUT, &data.velocities);
                 }
             }
 
@@ -128,9 +124,11 @@ fn tick(
 
     let update = PackedData {
         indices: compute_worker.read_vec(Buffers::INDICES_MAIN),
-        positions: compute_worker.read_vec(Buffers::POSITIONS_IN),
-        velocities: compute_worker.read_vec(Buffers::VELOCITIES_IN),
+        positions: compute_worker.read_vec(Buffers::POSITIONS_OUT),
+        velocities: compute_worker.read_vec(Buffers::VELOCITIES_OUT),
     };
+
+    // dbg!(compute_worker.read_vec::<u32>(Buffers::INDICES_AUX));
 
     wrach_state.packed_data.indices.clone_from(&update.indices);
     wrach_state

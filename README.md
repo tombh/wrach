@@ -15,7 +15,7 @@ Using a dedicated Rust GPU shader compiler: https://github.com/tombh/rust-gpu-co
 
 Release build:
 
-- 1,000,000 particles at ~39fps
+- 1,000,000 particles at ~49fps
 
 ## Workflow
 

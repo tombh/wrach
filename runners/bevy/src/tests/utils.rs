@@ -14,10 +14,6 @@ use crate::{Particle, WrachConfig, WrachPlugin, WrachState};
 pub struct WrachTestAPI {
     /// An instance of a Bevy app, already setup for Wrach
     pub app: App,
-    /// All the positions of the particles
-    pub positions: Vec<(f32, f32)>,
-    /// All the velocities of the particles
-    pub velocities: Vec<(f32, f32)>,
 }
 
 impl WrachTestAPI {
@@ -25,11 +21,7 @@ impl WrachTestAPI {
     #[must_use]
     #[inline]
     pub fn new(config: WrachConfig) -> Self {
-        let mut wrach = Self {
-            app: App::new(),
-            positions: Vec::new(),
-            velocities: Vec::new(),
-        };
+        let mut wrach = Self { app: App::new() };
 
         let plugin = WrachPlugin { config };
         wrach
@@ -41,33 +33,22 @@ impl WrachTestAPI {
         wrach
     }
 
-    /// Run a single tick/frame of the simulation
+    /// Run a single tick/frame of the simulation.
     #[inline]
     pub fn tick(&mut self) {
         self.app.update();
-        self.read_data();
     }
 
-    /// Get data from the simulation
-    // TODO: Check performance of this. Are we using the data directly? There's no copying going
-    // on?
+    /// Run until we get our first data.
     #[inline]
-    pub fn read_data(&mut self) {
-        let state = self.app.world().resource::<WrachState>();
-
-        self.positions = state
-            .packed_data
-            .positions
-            .iter()
-            .map(|particle| (particle.x, particle.y))
-            .collect();
-
-        self.velocities = state
-            .packed_data
-            .velocities
-            .iter()
-            .map(|particle| (particle.x, particle.y))
-            .collect();
+    pub fn tick_until_first_data(&mut self) {
+        for _ in 0..5_u32 {
+            self.tick();
+            let data = &self.get_simulation_state().packed_data;
+            if data.positions.first().is_some() {
+                break;
+            }
+        }
     }
 
     /// Add particles to the simulation

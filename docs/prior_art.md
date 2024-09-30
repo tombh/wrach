@@ -86,6 +86,7 @@ colour grading techniques. And he made a 6 hour long video explaining it all htt
 - https://www.youtube.com/@danygankoff
 - https://www.youtube.com/@cyber-gate
 - https://www.youtube.com/@NephPlays C#/OpenGL
+- https://www.youtube.com/@DestinyHailstorm
 
 ### Code
 

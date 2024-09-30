@@ -1,6 +1,6 @@
 //! Wrach physics shaders
 
-#![no_std]
+#![cfg_attr(target_arch = "spirv", no_std)]
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::arithmetic_side_effects)]
 #![allow(clippy::cast_precision_loss)]
@@ -9,42 +9,50 @@
 #![allow(clippy::explicit_counter_loop)]
 #![allow(clippy::needless_range_loop)]
 
-use cell::World;
+use cell::Cell;
 use spirv_std::{
     glam::{UVec3, Vec2},
     spirv,
 };
-use wrach_cpu_gpu_shared::WorldSettings;
+use wrach_cpu_gpu_shared::{WorldSettings, PREFIX_SUM_OFFSET_HACK};
 
 mod cell;
+mod indices;
 mod particle;
 mod particles;
 
-/// NB: We add one to cell indexes because our current prefix sum implementation shifts all its items
-/// one to the right.
-pub const PREFIX_SUM_HACK: u32 = 1;
-
 /// Physics entrypoint
-#[spirv(compute(threads(32)))]
+#[spirv(compute(threads(64)))]
 pub fn main(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(uniform, descriptor_set = 0, binding = 0)] settings: &WorldSettings,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] indices: &mut [u32],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] positions_input: &[Vec2],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] positions_output: &mut [Vec2],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] velocities_input: &[Vec2],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 5)] velocities_output: &mut [Vec2],
-) {
-    let current_cell = (id.x + PREFIX_SUM_HACK) as usize;
 
-    let mut world = World {
-        current_cell,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] indices_main: &mut [u32],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] positions_in: &[Vec2],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] positions_out: &mut [Vec2],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 4)] velocities_in: &[Vec2],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 5)] velocities_out: &mut [Vec2],
+
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 6)] indices_aux: &mut [u32],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 7)] positions_aux: &[Vec2],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 8)] velocities_aux: &[Vec2],
+) {
+    let current_cell = (id.x + PREFIX_SUM_OFFSET_HACK) as usize;
+
+    let mut world = Cell {
+        current: current_cell,
+        is_last: false,
         settings,
-        indices,
-        positions_input,
-        positions_output,
-        velocities_input,
-        velocities_output,
+
+        indices_main,
+        positions_in,
+        positions_out,
+        velocities_in,
+        velocities_out,
+
+        indices_aux,
+        positions_aux,
+        velocities_aux,
     };
 
     world.physics_for_cell();

@@ -1,6 +1,6 @@
 //! Code shared by both the CPU and GPU
 
-#![no_std]
+#![cfg_attr(target_arch = "spirv", no_std)]
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::arithmetic_side_effects)]
 #![allow(clippy::cast_precision_loss)]
@@ -15,6 +15,7 @@ use spirv_std::glam::{UVec2, Vec2};
 
 /// Config needed by the simulation
 #[allow(clippy::exhaustive_structs)]
+#[derive(Default)]
 pub struct WorldSettings {
     /// Dimensions of the view onto the simulation
     pub view_dimensions: Vec2,
@@ -30,4 +31,8 @@ pub struct WorldSettings {
 }
 
 /// The size of a single spatial bin cell. The unit is one side of the square.
-pub const SPATIAL_BIN_CELL_SIZE: u16 = 3;
+pub const SPATIAL_BIN_CELL_SIZE: u16 = 2;
+
+/// NB: We add one to cell indexes because our current prefix sum implementation shifts all its items
+/// one to the right.
+pub const PREFIX_SUM_OFFSET_HACK: u32 = 1;

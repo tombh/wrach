@@ -20,6 +20,9 @@ impl PhysicsComputeWorker {
                 Buffers::POSITIONS_OUT,
                 Buffers::VELOCITIES_IN,
                 Buffers::VELOCITIES_OUT,
+                Buffers::INDICES_AUX,
+                Buffers::POSITIONS_AUX,
+                Buffers::VELOCITIES_AUX,
             ],
         );
         builder
@@ -34,7 +37,7 @@ impl IntegrationShader {
     // TODO: Explain and explore workgroup sizes
     /// Calculate workgroup sizes
     const fn workgroups(total_cells: u32) -> [u32; 3] {
-        let partition = 32;
+        let partition = 64;
         let main_workgroup_size = u32::div_ceil(total_cells, partition);
         [main_workgroup_size, 1, 1]
     }
