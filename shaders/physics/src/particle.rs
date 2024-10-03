@@ -6,6 +6,8 @@ use spirv_std::{
 };
 use wrach_cpu_gpu_shared::WorldSettings;
 
+use crate::WORKGROUP_MEMORY_SIZE;
+
 /// Convenient representation of a particle
 #[derive(Default, Copy, Clone)]
 pub struct Particle {
@@ -23,6 +25,24 @@ impl<'particle> Particle {
         index: usize,
         positions_input: &'particle [Vec2],
         velocities_input: &'particle [Vec2],
+    ) -> Self {
+        // SAFETY:
+        //   Getting data with bounds checks is obviously undefined behaviour. We rely on the
+        //   rest of the pipeline to ensure that indices are always within limits.
+        #[allow(clippy::multiple_unsafe_ops_per_block)]
+        unsafe {
+            Self {
+                index,
+                position: *positions_input.index_unchecked(index),
+                velocity: *velocities_input.index_unchecked(index),
+            }
+        }
+    }
+
+    pub fn new_aux(
+        index: usize,
+        positions_input: &'particle [Vec2; WORKGROUP_MEMORY_SIZE],
+        velocities_input: &'particle [Vec2; WORKGROUP_MEMORY_SIZE],
     ) -> Self {
         // SAFETY:
         //   Getting data with bounds checks is obviously undefined behaviour. We rely on the

@@ -8,6 +8,7 @@ use crate::cell::MAX_PARTICLES_IN_CELL;
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
 pub struct Indices {
+    pub workgroup_offset: usize,
     pub centre: Storage,
     pub bottom_left: Storage,
     pub bottom_right: Storage,
@@ -48,37 +49,49 @@ impl Location {
 
 impl Indices {
     /// Instantiate
-    pub fn new(index_main: &[u32], index_aux: &[u32], cell_index: usize, grid_width: u32) -> Self {
+    pub fn new(
+        index_main: &[u32],
+        index_aux: &[u32],
+        cell_index: usize,
+        grid_width: u32,
+        workgroup_offset: usize,
+    ) -> Self {
         Self {
+            workgroup_offset,
             centre: Self::get_start_end_indices_of_particles_in_cell(
                 index_main,
                 Location::CENTRE,
                 cell_index,
                 grid_width,
+                0,
             ),
             bottom_left: Self::get_start_end_indices_of_particles_in_cell(
                 index_aux,
                 Location::BOTTOM_LEFT,
                 cell_index,
                 grid_width,
+                workgroup_offset,
             ),
             bottom_right: Self::get_start_end_indices_of_particles_in_cell(
                 index_aux,
                 Location::BOTTOM_RIGHT,
                 cell_index,
                 grid_width,
+                workgroup_offset,
             ),
             top_left: Self::get_start_end_indices_of_particles_in_cell(
                 index_aux,
                 Location::TOP_LEFT,
                 cell_index,
                 grid_width,
+                workgroup_offset,
             ),
             top_right: Self::get_start_end_indices_of_particles_in_cell(
                 index_aux,
                 Location::TOP_RIGHT,
                 cell_index,
                 grid_width,
+                workgroup_offset,
             ),
         }
     }
@@ -90,6 +103,7 @@ impl Indices {
         location: u32,
         centre_cell_index: usize,
         grid_width: u32,
+        workgroup_offset: usize,
     ) -> Storage {
         let aux_grid_width = grid_width as usize + 2;
 
@@ -126,8 +140,8 @@ impl Indices {
             end_by: particles_end_by as usize,
         };
         let local = Range {
-            from: local_index,
-            end_by: local_index + particles_count as usize,
+            from: local_index - workgroup_offset,
+            end_by: local_index + particles_count as usize - workgroup_offset,
         };
 
         Storage { global, local }
@@ -150,7 +164,7 @@ mod tests {
                 0, 0, 0,
                 0, 0, 1
         ];
-        Indices::new(&indices_main, &indices_aux, cell_index, 2)
+        Indices::new(&indices_main, &indices_aux, cell_index, 2, 0)
     }
 
     #[test]
