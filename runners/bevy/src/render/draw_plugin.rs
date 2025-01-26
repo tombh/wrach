@@ -4,7 +4,7 @@ use bevy::{
     core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
-        render_graph::{RenderGraphApp, ViewNodeRunner},
+        render_graph::{RenderGraphApp as _, ViewNodeRunner},
         MainWorld, RenderApp,
     },
 };
@@ -19,10 +19,11 @@ use crate::{
 use super::pipeline::DrawParticlePipeline;
 
 /// An optional plugin to draw particles as simple pixels
-#[allow(clippy::exhaustive_structs)]
+#[derive(Default)]
+#[non_exhaustive]
 pub struct DrawPlugin;
 
-#[allow(clippy::missing_trait_methods)]
+#[expect(clippy::missing_trait_methods, reason = "We just don't need to others")]
 impl Plugin for DrawPlugin {
     #[inline]
     fn build(&self, app: &mut App) {
@@ -41,11 +42,14 @@ impl Plugin for DrawPlugin {
 
 /// Startup system for [`DrawPlugin`]
 fn startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 }
 
 /// Simple system to check that our custom setup has happened.
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy's system function signature can't be changed"
+)]
 const fn check_is_setup(maybe: Option<Res<ParticleBindGroupLayout>>) -> bool {
     maybe.is_none()
 }
@@ -53,12 +57,14 @@ const fn check_is_setup(maybe: Option<Res<ParticleBindGroupLayout>>) -> bool {
 /// We don't use the traditional `Setup` schedule because bindgroups aren't ready from the
 /// compute plugin and the `PipelineCache` isn't ready for [`DrawParticlePipeline`].
 /// I'd like to know if there's a better way of doing this?
+#[expect(
+    clippy::expect_used,
+    reason = "`expect`s until there's a way to use `?` in systems"
+)]
 fn setup(mut commands: Commands, mut world: ResMut<MainWorld>) {
-    #[allow(clippy::expect_used)]
     let particle_bind_group_layout = world
         .remove_resource::<ParticleBindGroupLayout>()
         .expect("Couldn't remove `ParticleBindGroupLayout` from main world");
-    #[allow(clippy::expect_used)]
     let particle_bind_group = world
         .remove_resource::<ParticleBindGroup>()
         .expect("Couldn't remove `ParticleBindGroup` from main world");
@@ -70,7 +76,10 @@ fn setup(mut commands: Commands, mut world: ResMut<MainWorld>) {
 
 /// Synchronise the [`ShaderWorldSettings`] from the main world so they can be used in the shader.
 /// Sync happens for every frame.
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Bevy's magic system function signature can't be changed"
+)]
 fn sync_world_settings(mut commands: Commands, world: ResMut<MainWorld>) {
     let state = world.resource::<WrachState>();
     commands.insert_resource::<ShaderWorldSettings>(state.shader_settings);

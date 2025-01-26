@@ -1,8 +1,12 @@
 //! Bevy plugin for Wrach 2D pixel physics
 
-// Apparently `pub use` is bad?
-// https://rust-lang.github.io/rust-clippy/master/index.html#/pub_use
-#![allow(clippy::pub_use)]
+#![expect(
+    clippy::pub_use,
+    reason = "
+        If there's another way to re-export I'd like to know it.
+        I'm taking advice from the Clippy Lint docs: https://rust-lang.github.io/rust-clippy/master/index.html#/pub_use
+    "
+)]
 
 /// Tests
 #[cfg(test)]
@@ -45,6 +49,5 @@ mod state;
 pub use crate::config_app::WrachConfig;
 pub use crate::plugin::build::WrachPlugin;
 pub use crate::render::draw_plugin::DrawPlugin;
-pub use crate::spatial_bin::PackedData;
 pub use crate::state::Particle;
 pub use crate::state::WrachState;

@@ -1,14 +1,12 @@
 //! The render pipeline for drawing particles as simple pixels
 
 use bevy::{
-    asset::DirectAssetAccessExt,
+    asset::DirectAssetAccessExt as _,
+    image::BevyDefault as _,
     prelude::{FromWorld, Resource, World},
-    render::{
-        render_resource::{
-            CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, MultisampleState,
-            PipelineCache, PrimitiveState, TextureFormat, VertexState,
-        },
-        texture::BevyDefault,
+    render::render_resource::{
+        CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, MultisampleState,
+        PipelineCache, PrimitiveState, TextureFormat, VertexState,
     },
 };
 
@@ -25,7 +23,7 @@ impl FromWorld for DrawParticlePipeline {
     fn from_world(world: &mut World) -> Self {
         let bindings = world.resource::<ParticleBindGroupLayout>();
         let shader =
-            world.load_asset("embedded://wrach_bevy/plugin/../../../../assets/shaders/render.wgsl");
+            world.load_asset("embedded://wrach_bevy/plugin/../../../../assets/shaders/draw.wgsl");
 
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = pipeline_cache.queue_render_pipeline(
@@ -56,6 +54,7 @@ impl FromWorld for DrawParticlePipeline {
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
+                zero_initialize_workgroup_memory: true,
             },
         );
 

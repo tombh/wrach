@@ -13,7 +13,7 @@ use crate::{
 
 /// All simulation state, exported for end users
 #[derive(Resource)]
-#[allow(clippy::exhaustive_structs)]
+#[non_exhaustive]
 pub struct WrachState {
     /// User-defined config
     pub config: WrachConfig,
@@ -34,7 +34,10 @@ pub struct WrachState {
 
 /// Wrach's representation of a particle. Probably will only ever be used for inserting.
 #[derive(Clone, Copy)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "TODO: Use `#[non_exhaustive]` and https://github.com/elastio/bon"
+)]
 pub struct Particle {
     /// Position of particle in units of `WrachConfig::dimensions`
     pub position: Position,

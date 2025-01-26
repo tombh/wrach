@@ -2,9 +2,9 @@
 
 // Apparently `pub use` is bad?
 // https://rust-lang.github.io/rust-clippy/master/index.html#/pub_use
-#![allow(clippy::pub_use)]
+#![expect(clippy::pub_use, reason = "I think it's the only way to re-export?")]
 
-use bevy::prelude::PluginGroup;
+use bevy::prelude::PluginGroup as _;
 use bevy::{app::App, winit::WinitPlugin, DefaultPlugins};
 use wrach_bevy::{WrachPlugin, WrachState};
 
@@ -13,7 +13,7 @@ pub use wrach_bevy::Particle;
 pub use wrach_bevy::WrachConfig;
 
 /// Main struct for Wrach physics simulations
-#[allow(clippy::exhaustive_structs)]
+#[non_exhaustive]
 pub struct WrachAPI {
     /// An instance of a Bevy app, already setup for Wrach
     pub app: App,
@@ -34,7 +34,7 @@ impl WrachAPI {
             velocities: Vec::new(),
         };
 
-        let plugin = WrachPlugin { config };
+        let plugin = WrachPlugin::new(config);
         wrach
             .app
             .add_plugins(DefaultPlugins.build().disable::<WinitPlugin>())
@@ -87,8 +87,11 @@ impl WrachAPI {
     }
 }
 
-#[allow(clippy::indexing_slicing)]
-#[allow(clippy::default_numeric_fallback)]
+#[expect(
+    clippy::indexing_slicing,
+    clippy::default_numeric_fallback,
+    reason = "Tests aren't so strict"
+)]
 #[cfg(test)]
 mod test {
     use bevy::math::Vec2;

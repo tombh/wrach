@@ -20,10 +20,11 @@ Release build:
 ## Workflow
 
 - Tests: `cargo test --workspace`
-- Lint `cargo clippy --all --all-targets --all-features`
+- Lint `cargo clippy --all --all-targets --all-features -- --deny warnings`
 - Remove unused deps: `cargo shear --fix`
 
 ## TODO
 
-- [ ] Support changing the workgroup size without recreating the compute worker
+- [ ] Support changing the workgroup size without recreating the comp ute worker
 - [ ] Confirm how long it takes between `.gpu_uploads()` and the change appearing on screen
+- [ ] Logs should not output unless explicitly requested in `RUST_LOG`

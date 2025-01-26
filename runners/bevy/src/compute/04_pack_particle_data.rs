@@ -42,7 +42,6 @@ impl PackNewParticleDataShader {
     }
 }
 
-#[allow(clippy::missing_trait_methods)]
 impl ComputeShader for PackNewParticleDataShader {
     fn shader() -> ShaderRef {
         "embedded://wrach_bevy/plugin/../../../../assets/shaders/pack_new_particle_data.wgsl".into()
@@ -53,9 +52,13 @@ impl ComputeShader for PackNewParticleDataShader {
     }
 }
 
-#[allow(clippy::default_numeric_fallback)]
-#[allow(clippy::indexing_slicing)]
-#[allow(clippy::unwrap_used)]
+// TODO: Is there a workspace-level way of blanket allowing these lints?
+#[expect(
+    clippy::default_numeric_fallback,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    reason = "Test's don't need to be so strict"
+)]
 #[cfg(test)]
 mod test {
     use bevy::math::Vec2;
@@ -123,8 +126,8 @@ mod test {
         );
 
         let mut allow_random_order_in_cell = gpu_packed_data.positions.clone();
-        #[allow(clippy::min_ident_chars)]
-        allow_random_order_in_cell[0..2].sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
+        allow_random_order_in_cell[0..2]
+            .sort_by(|this_one, next_one| this_one.x.partial_cmp(&next_one.x).unwrap());
         assert_eq!(
             allow_random_order_in_cell[0..2],
             vec![Vec2::new(0.1, 0.1), Vec2::new(2.5, 2.5)]

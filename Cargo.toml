@@ -47,7 +47,7 @@ strip = "debuginfo"
 spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu" }
 
 [workspace.dependencies.bevy]
-version = "0.14.1"
+version = "0.15.1"
 default-features = false
 # # See https://github.com/bevyengine/bevy/blob/main/docs/cargo_features.md
 features = [
@@ -64,7 +64,7 @@ wrach-api = { path = "runners/api" }
 rand = "0.8.5"
 
 [dev-dependencies.bevy]
-version = "0.14.1"
+version = "0.15.1"
 features = [
   "wayland",
   "embedded_watcher", # Hot-reloading `embedded_asset!` assets, like shaders
@@ -95,6 +95,8 @@ separated_literal_suffix = { level = "allow", priority = 1 }
 module_name_repetitions = { level = "allow", priority = 1 }
 decimal_literal_representation = { level = "allow", priority = 1 }
 multiple_inherent_impl = { level = "allow", priority = 1 }
+arbitrary_source_item_ordering = { level = "allow", priority = 1 }
+missing_trait_methods = { level = "allow", priority = 1 }
 
 # I'd like to set this to "warn", but it seems that it can't be disabled on a per-crate basis
 # See: https://github.com/rust-lang/rust-clippy/issues/7342

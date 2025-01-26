@@ -1,13 +1,16 @@
 //! All the config needed for the physics shader to work
 
-// The `ShaderType` derive seems to create code where the final field is duplicated
-#![allow(clippy::shadow_reuse)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "The `ShaderType` derive seems to create code where the final field is duplicated"
+)]
 
 use bevy::prelude::Vec2;
 use bevy::render::render_resource::ShaderType;
 use bevy::{math::UVec2, prelude::Resource};
 use bytemuck::{Pod, Zeroable};
 
+// TODO: Document why we can't share with `WorldSettings` in `shaders/shared/lib.rs`.
 /// Config for the shader about the simulation world
 #[derive(ShaderType, Resource, Pod, Zeroable, Clone, Copy, Default, Debug)]
 #[repr(C)]

@@ -1,7 +1,7 @@
 //! A cell is the unit of work in our GPU compute workload. A single work item loads all the
 //! particles in a spatial bin cell (and its surroundings) and does physics on this particles.
 
-use spirv_std::{arch::IndexUnchecked, glam::Vec2};
+use spirv_std::{arch::IndexUnchecked as _, glam::Vec2};
 
 use wrach_cpu_gpu_shared::{self as shared, WorldSettings};
 
@@ -21,8 +21,11 @@ use crate::{particle::Particle, particles::Particles, PREFIX_SUM_HACK};
 const CELL_LEEWAY: f32 = 1.0;
 
 /// The maximum number of particles we can handle in a cell.
-#[allow(clippy::cast_sign_loss)]
-#[allow(clippy::cast_possible_truncation)]
+#[expect(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    reason = "I don't think these are issues"
+)]
 pub const MAX_PARTICLES_IN_CELL: usize =
     (shared::SPATIAL_BIN_CELL_SIZE.pow(2) as f32 * CELL_LEEWAY) as usize;
 
@@ -97,7 +100,6 @@ impl World<'_> {
         // SAFETY:
         //   Getting data with bounds checks is obviously undefined behaviour. We rely on the
         //   rest of the pipeline to ensure that indices are always within limits.
-        #[allow(clippy::multiple_unsafe_ops_per_block)]
         let (particles_start_at, marker) = unsafe {
             (
                 self.indices.index_unchecked(self.current_cell),

@@ -70,22 +70,7 @@ impl ParticleStore {
 
     /// Create an efficient spatial representation of all the currently active particles in and
     /// around the viewport.
-    pub fn create_packed_data(&mut self) -> PackedData {
-        let data = self.spatial_bin.create_packed_data(self);
-
-        // TODO: move this to `update_from_gpu` once GPU prefix sum is fully working.
-        #[allow(clippy::expect_used)]
-        {
-            self.particles_in_frame_count = data
-                .positions
-                .len()
-                .try_into()
-                .expect("More particles than fit into u32");
-        };
-
-        data
-    }
-
+    ///
     // TODO:
     //   - Save GPU data to CPU memory and disk.
     //   - Probably use Persist with https://github.com/cberner/redb
@@ -98,11 +83,36 @@ impl ParticleStore {
     //     let particles_count = particles
     //     let particles
     // }
+    #[expect(
+        clippy::expect_used,
+        reason = "`expect`s until there's a way to use `?` in systems"
+    )]
+    pub fn create_packed_data(&mut self) -> PackedData {
+        let data = self.spatial_bin.create_packed_data(self);
+
+        // TODO: move this to `update_from_gpu` once GPU prefix sum is fully working.
+        {
+            self.particles_in_frame_count = data
+                .positions
+                .len()
+                .try_into()
+                .expect("More particles than fit into u32");
+        };
+
+        data
+    }
 
     /// Calculate the maximum number of particles involved in a single frame. Equal to
     /// those that can be seen from the viewport and those that make up a border of spatial bin
     /// cells around the viewport
-    #[allow(clippy::arithmetic_side_effects)]
+    #[expect(
+        clippy::expect_used,
+        reason = "`expect`s until there's a way to use `?` in systems"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "I'm assuming that because of the numbers involved, there won't be any overflow"
+    )]
     pub fn max_particles_per_frame(&self) -> u32 {
         // Extra particles to add.
         // TODO:
@@ -111,7 +121,6 @@ impl ParticleStore {
         let extra_percent = 10;
 
         let (cells, _grid) = self.spatial_bin.get_active_cells();
-        #[allow(clippy::expect_used)]
         let total_cells: u32 = cells
             .len()
             .try_into()
@@ -125,7 +134,7 @@ impl ParticleStore {
 }
 
 #[cfg(test)]
-#[allow(clippy::indexing_slicing)]
+#[expect(clippy::indexing_slicing, reason = "Tests aren't so strict")]
 mod tests {
     use bevy::math::{Vec2, Vec4};
 

@@ -14,7 +14,7 @@ use crate::{
 use super::bind_groups::ParticleBindGroupLayout;
 
 /// The Wrach Bevy Plugin
-#[allow(clippy::exhaustive_structs)]
+#[non_exhaustive]
 pub struct WrachPlugin {
     /// All the user-defineable config for Wrach
     pub config: WrachConfig,
@@ -29,7 +29,16 @@ impl Default for WrachPlugin {
     }
 }
 
-#[allow(clippy::missing_trait_methods)]
+impl WrachPlugin {
+    /// New instance
+    #[must_use]
+    #[inline]
+    pub const fn new(config: WrachConfig) -> Self {
+        Self { config }
+    }
+}
+
+#[expect(clippy::missing_trait_methods, reason = "We just don't need 'em all")]
 impl Plugin for WrachPlugin {
     #[inline]
     fn build(&self, app: &mut App) {
@@ -68,7 +77,7 @@ fn embed_shaders(app: &mut App) {
         app,
         "../../../../assets/shaders/pack_new_particle_data.wgsl"
     );
-    embedded_asset!(app, "../../../../assets/shaders/render.wgsl");
+    embedded_asset!(app, "../../../../assets/shaders/draw.wgsl");
 }
 
 /// Upload data to the GPU.
@@ -86,8 +95,10 @@ fn maybe_upload_to_gpu(
 
     for upload in &wrach_state.gpu_uploads {
         match *upload {
-            // I don't understand the `ref` keyword. `&` gives a "mismatched types" error.
-            #[allow(clippy::ref_patterns)]
+            #[expect(
+                clippy::ref_patterns,
+                reason = "I don't understand the `ref` keyword. `&` gives a 'mismatched types' error."
+            )]
             GPUUpload::PackedData(ref data) => {
                 debug!("Uploading packed data");
 
@@ -117,7 +128,10 @@ fn maybe_upload_to_gpu(
 /// What to do for every frame/tick of the simulation
 //
 // Is there a way for a bevy system to receive a reference to a Resource
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "We have no choice because of the magic Bevy systems function signature"
+)]
 fn tick(
     compute_worker: Res<AppComputeWorker<PhysicsComputeWorker>>,
     mut wrach_state: ResMut<WrachState>,

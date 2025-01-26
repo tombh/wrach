@@ -54,6 +54,10 @@ pub struct ParticleBindGroup {
     pub bind_group: BindGroup,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "`expect`s until there's a way to use `?` in systems"
+)]
 pub fn get_buffers_for_renderer(world: &mut World) {
     let render_device = world.resource::<RenderDevice>();
     let bind_group_layout = world.resource::<ParticleBindGroupLayout>();
@@ -63,16 +67,12 @@ pub fn get_buffers_for_renderer(world: &mut World) {
         None,
         &bind_group_layout.bind_group_layout,
         &BindGroupEntries::sequential((
-            #[allow(clippy::expect_used)]
             compute_worker
-                .buffers
-                .get(Buffers::WORLD_SETTINGS_UNIFORM)
+                .get_buffer(Buffers::WORLD_SETTINGS_UNIFORM)
                 .expect("Couldn't get world settings buffer")
                 .as_entire_binding(),
-            #[allow(clippy::expect_used)]
             compute_worker
-                .buffers
-                .get(Buffers::POSITIONS_IN)
+                .get_buffer(Buffers::POSITIONS_IN)
                 .expect("Couldn't get particle positions buffer")
                 .as_entire_binding(),
         )),

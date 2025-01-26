@@ -1,13 +1,18 @@
 //! Wrach physics shaders
 
+#![expect(
+    stable_features,
+    reason = "Remove `feature(lint_reasons)` once `rust-gpu` supports Rust 1.81"
+)]
+#![feature(lint_reasons)]
 #![no_std]
-#![allow(clippy::missing_inline_in_public_items)]
-#![allow(clippy::arithmetic_side_effects)]
-#![allow(clippy::cast_precision_loss)]
-#![allow(clippy::as_conversions)]
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::explicit_counter_loop)]
-#![allow(clippy::needless_range_loop)]
+#![expect(
+    clippy::arithmetic_side_effects,
+    clippy::as_conversions,
+    clippy::explicit_counter_loop,
+    clippy::multiple_unsafe_ops_per_block,
+    reason = "`rust-gpu` is a subset of Rust and has some unique requirements"
+)]
 
 use cell::World;
 use spirv_std::{
@@ -25,6 +30,14 @@ mod particles;
 pub const PREFIX_SUM_HACK: u32 = 1;
 
 /// Physics entrypoint
+#[allow(
+    clippy::allow_attributes,
+    reason = "For some reason `expect` doesn't detect the veracity of the 'inline' lint"
+)]
+#[allow(
+    clippy::missing_inline_in_public_items,
+    reason = "SPIR-V requires an entrypoint"
+)]
 #[spirv(compute(threads(32)))]
 pub fn main(
     #[spirv(global_invocation_id)] id: UVec3,

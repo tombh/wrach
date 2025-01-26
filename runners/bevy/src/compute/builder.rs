@@ -17,14 +17,20 @@ impl PhysicsComputeWorker {
 }
 
 impl ComputeWorker for PhysicsComputeWorker {
+    #[expect(
+        clippy::expect_used,
+        reason = "`expect`s until there's a way to use `?` in systems"
+    )]
     fn build(world: &mut World) -> AppComputeWorker<Self> {
         let mut state = world.resource_mut::<WrachState>();
 
         let (cells, _grid) = state.particle_store.spatial_bin.get_active_cells();
-        #[allow(clippy::arithmetic_side_effects)]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "Overflow and division by zero are unlikely"
+        )]
         let total_cells_usize =
             cells.len() + Self::PREFIX_SUM_GUARD_ITEM + Self::PREFIX_SUM_OFFSET_HACK;
-        #[allow(clippy::expect_used)]
         let total_cells: u32 = total_cells_usize
             .try_into()
             // Wow, imagine if we're simulating that many cells!
@@ -38,7 +44,6 @@ impl ComputeWorker for PhysicsComputeWorker {
         debug!("Total spatial bins cells: {:?}", total_cells);
 
         let max_particles = state.particle_store.max_particles_per_frame();
-        #[allow(clippy::expect_used)]
         let max_particles_usize: usize = max_particles
             .try_into()
             .expect("Couldn't convert `max_particles` to `Vec` capacity");
@@ -49,8 +54,6 @@ impl ComputeWorker for PhysicsComputeWorker {
         let velocities = vec![Vec2::default(); max_particles_usize];
 
         let shader_settings = ShaderWorldSettings {
-            #[allow(clippy::cast_precision_loss)]
-            #[allow(clippy::as_conversions)]
             view_dimensions: Vec2::new(
                 state.config.dimensions.0.into(),
                 state.config.dimensions.1.into(),

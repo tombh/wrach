@@ -2,7 +2,11 @@
 
 /// All the config for the Wrach Bevy plugin
 #[derive(Clone, Copy)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "TODO: Use `#[non_exhaustive]` and https://github.com/elastio/bon"
+)]
+// #[non_exhaustive]
 pub struct WrachConfig {
     /// Dimensions of the realtime view onto the simulation. Doesn't necessarily imply the size of
     /// any window, that should be handled outside this plugin

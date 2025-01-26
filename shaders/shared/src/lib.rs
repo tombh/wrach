@@ -1,11 +1,11 @@
 //! Code shared by both the CPU and GPU
 
+#![expect(
+    stable_features,
+    reason = "Remove `feature(lint_reasons)` once `rust-gpu` supports Rust 1.81"
+)]
+#![feature(lint_reasons)]
 #![no_std]
-#![allow(clippy::missing_inline_in_public_items)]
-#![allow(clippy::arithmetic_side_effects)]
-#![allow(clippy::cast_precision_loss)]
-#![allow(clippy::as_conversions)]
-#![allow(clippy::too_many_arguments)]
 
 #[cfg(not(target_arch = "spirv"))]
 use bevy::prelude::{UVec2, Vec2};
@@ -13,8 +13,9 @@ use bevy::prelude::{UVec2, Vec2};
 #[cfg(target_arch = "spirv")]
 use spirv_std::glam::{UVec2, Vec2};
 
+// TODO: Document why we can't share with `ShaderWorldSettings` in `bevy/src/config_shader.rs`.
 /// Config needed by the simulation
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs, reason = "")]
 pub struct WorldSettings {
     /// Dimensions of the view onto the simulation
     pub view_dimensions: Vec2,

@@ -1,16 +1,11 @@
 //! Rust interface to Wrach simulations
 
-// Apparently `pub use` is bad?
-// https://rust-lang.github.io/rust-clippy/master/index.html#/pub_use
-#![allow(clippy::pub_use)]
-
-use bevy::prelude::PluginGroup;
+use bevy::prelude::PluginGroup as _;
 use bevy::{app::App, winit::WinitPlugin, DefaultPlugins};
 
 use crate::{Particle, WrachConfig, WrachPlugin, WrachState};
 
 /// Main struct for Wrach physics simulations
-#[allow(clippy::exhaustive_structs)]
 pub struct WrachTestAPI {
     /// An instance of a Bevy app, already setup for Wrach
     pub app: App,

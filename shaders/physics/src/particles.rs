@@ -1,6 +1,6 @@
 //! Handle particles interacting with each other
 
-use spirv_std::{arch::IndexUnchecked, glam::Vec2};
+use spirv_std::{arch::IndexUnchecked as _, glam::Vec2};
 use wrach_cpu_gpu_shared::WorldSettings;
 
 use crate::{cell::MAX_PARTICLES_IN_CELL, particle::Particle};
@@ -120,7 +120,7 @@ impl Particles {
     }
 }
 
-#[allow(clippy::unreadable_literal)]
+#[expect(clippy::unreadable_literal, reason = "Tests aren't so strict")]
 #[cfg(test)]
 mod test {
     use super::*;

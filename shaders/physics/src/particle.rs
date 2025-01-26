@@ -1,7 +1,7 @@
 //! A single particle and everything that can be done to it
 
 use spirv_std::{
-    arch::IndexUnchecked,
+    arch::IndexUnchecked as _,
     glam::{vec4, Vec2},
 };
 use wrach_cpu_gpu_shared::WorldSettings;
@@ -27,7 +27,6 @@ impl<'particle> Particle {
         // SAFETY:
         //   Getting data with bounds checks is obviously undefined behaviour. We rely on the
         //   rest of the pipeline to ensure that indices are always within limits.
-        #[allow(clippy::multiple_unsafe_ops_per_block)]
         unsafe {
             Self {
                 index,
@@ -85,7 +84,6 @@ impl<'particle> Particle {
     /// Write particle data back to buffer
     pub fn write(&self, positions_output: &mut [Vec2], velocities_output: &mut [Vec2]) {
         // SAFETY: See same comment for `new()`
-        #[allow(clippy::multiple_unsafe_ops_per_block)]
         unsafe {
             let position_reference = positions_output.index_unchecked_mut(self.index);
             *position_reference = self.position;
@@ -94,7 +92,7 @@ impl<'particle> Particle {
             *velocity_reference = self.velocity;
 
             // TODO:
-            //   Wait for Bevy 0.15 and its support of Naga's atomics, see:
+            //   Now that we're on Bevy 0.15 we have support for Naga's atomics, see:
             //   https://github.com/gfx-rs/wgpu/issues/4489
             //   This will allow us to remove a whole GPU pass.
             //

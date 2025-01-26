@@ -2,7 +2,7 @@
 //! [See:](https://matthias-research.github.io/pages/tenMinutePhysics/11-hashing.pdf)
 
 use crate::particle_store::{ParticleData, ParticleStore};
-use bevy::math::{IVec2, UVec2, Vec2, Vec4, Vec4Swizzles};
+use bevy::math::{IVec2, UVec2, Vec2, Vec4, Vec4Swizzles as _};
 
 /// The coordinates of a cell in the Spatial Binning grid
 pub type SpatialBinCoord = IVec2;
@@ -19,7 +19,6 @@ pub struct SpatialBin {
 
 /// An efficient data structure for searching particles.
 #[derive(Default)]
-#[allow(clippy::exhaustive_structs)]
 pub struct PackedData {
     /// A vector of spatial bin cells. Each item points to the corresponding array index of the first
     /// particle in the cell. The next item, whether the cell has particles or not, contains the
@@ -49,9 +48,14 @@ impl SpatialBin {
     pub fn get_cell_coord(&self, position: Vec2) -> SpatialBinCoord {
         let cell_size_f32: f32 = self.cell_size.into();
 
-        // I don't think `as`-casting should cause any terrible problems?
-        #[allow(clippy::as_conversions)]
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(
+            clippy::as_conversions,
+            reason = "I just can't figure out how to do it otherwise!"
+        )]
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "We're just not going anywhere near i32's max"
+        )]
         {
             let cell_x = position.x.div_euclid(cell_size_f32) as i32;
             let cell_y = position.y.div_euclid(cell_size_f32) as i32;
@@ -67,7 +71,10 @@ impl SpatialBin {
 
         let bottom_left = self.get_cell_coord(self.viewport.xy());
         let top_right = self.get_cell_coord(self.viewport.zw());
-        #[allow(clippy::arithmetic_side_effects)]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "We're not hittin limits nor dividing by zero."
+        )]
         for y in bottom_left.y..=top_right.y {
             grid_dimensions.y += 1_u32;
             for x in bottom_left.x..=top_right.x {
@@ -89,6 +96,10 @@ impl SpatialBin {
 
     /// Create an efficient spatial representation of all the currently active particles in and
     /// around the viewport.
+    #[expect(
+        clippy::expect_used,
+        reason = "`expect`s until there's a way to use `?` in systems"
+    )]
     pub fn create_packed_data(&self, store: &ParticleStore) -> PackedData {
         let (cells, _grid) = self.get_active_cells();
         let mut indices: Vec<u32> = Vec::new();
@@ -111,14 +122,16 @@ impl SpatialBin {
         for cell in cells {
             let particles = store.hashmap.get(&cell).unwrap_or(&empty_cell);
 
-            #[allow(clippy::expect_used)]
             let particle_count: u32 = particles
                 .positions
                 .len()
                 .try_into()
                 .expect("Couldn't convert particle count to u32");
 
-            #[allow(clippy::arithmetic_side_effects)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "Assuming there can't be any overflow"
+            )]
             {
                 current_index += particle_count;
             };

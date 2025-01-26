@@ -98,7 +98,6 @@ impl PrefixSumShaderDownSweep {
     }
 }
 
-#[allow(clippy::missing_trait_methods)]
 impl ComputeShader for PrefixSumShaderDownSweep {
     fn shader() -> ShaderRef {
         "embedded://wrach_bevy/plugin/../../../../assets/shaders/prefix_sum.wgsl".into()
@@ -124,7 +123,6 @@ impl PrefixSumShaderBoxSums {
     }
 }
 
-#[allow(clippy::missing_trait_methods)]
 impl ComputeShader for PrefixSumShaderBoxSums {
     fn shader() -> ShaderRef {
         "embedded://wrach_bevy/plugin/../../../../assets/shaders/prefix_sum.wgsl".into()
@@ -135,7 +133,10 @@ impl ComputeShader for PrefixSumShaderBoxSums {
     }
 }
 
-#[allow(clippy::default_numeric_fallback)]
+#[expect(
+    clippy::default_numeric_fallback,
+    reason = "Tests don't need to be so strict"
+)]
 #[cfg(test)]
 mod test {
     use bevy::math::Vec2;

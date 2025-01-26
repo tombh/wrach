@@ -32,7 +32,7 @@ fn main() {
             LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin,
             wrach,
-            DrawPlugin,
+            DrawPlugin::default(),
         ))
         .add_systems(Startup, startup)
         .add_systems(PreUpdate, keyboard_events)

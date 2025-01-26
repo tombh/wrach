@@ -10,9 +10,7 @@ wrach-cpu-gpu-shared = { path = "../../shaders/shared" }
 rand = "0.8.5"
 bytemuck = "1.18.0"
 
-# Remove "shader_format_spirv" feature when this issue is fixed:
-#   https://github.com/AnthonyTornetta/bevy_easy_compute/issues/7
-bevy_easy_compute = { git = "https://github.com/tombh/bevy_easy_compute", rev = "f890dd33", features = ["shader_format_spirv"] }
+bevy_easy_compute = {version = "0.15", features = [ "shader_format_spirv" ]}
 
 [dev-dependencies]
 wrach-api = { path = "../api" }

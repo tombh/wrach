@@ -23,7 +23,7 @@ pub struct DrawParticleLabel;
 #[derive(Default)]
 pub struct DrawParticleNode;
 
-#[allow(clippy::missing_trait_methods)]
+#[expect(clippy::missing_trait_methods, reason = "We just don't use 'em")]
 impl render_graph::ViewNode for DrawParticleNode {
     type ViewQuery = &'static ViewTarget;
 
@@ -31,7 +31,7 @@ impl render_graph::ViewNode for DrawParticleNode {
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext,
-        view_target: QueryItem<Self::ViewQuery>,
+        view_query: QueryItem<Self::ViewQuery>,
         world: &World,
     ) -> Result<(), render_graph::NodeRunError> {
         let pipeline_cache = world.resource::<PipelineCache>();
@@ -39,7 +39,7 @@ impl render_graph::ViewNode for DrawParticleNode {
         let settings = world.resource::<ShaderWorldSettings>();
         let bindings = world.resource::<ParticleBindGroup>();
 
-        let color_attachment = view_target.get_color_attachment();
+        let color_attachment = view_query.get_color_attachment();
 
         let mut pass = render_context
             .command_encoder()
@@ -51,12 +51,17 @@ impl render_graph::ViewNode for DrawParticleNode {
                 occlusion_query_set: None,
             });
 
-        // TODO: I couldn't figure out how to match on the reference.
-        #[allow(clippy::pattern_type_mismatch)]
+        #[expect(
+            clippy::pattern_type_mismatch,
+            reason = "I, @tombh, copied this from somewhere and am just being lazy in figuring out what the downsides are"
+        )]
         if let CachedPipelineState::Ok(pipeline_cached) =
             pipeline_cache.get_render_pipeline_state(pipeline.pipeline)
         {
-            #[allow(clippy::unreachable)]
+            #[expect(
+                clippy::unreachable,
+                reason = "I, @tombh, copied this from somewhere so don't actuall know why it's unreachable"
+            )]
             let Pipeline::RenderPipeline(pipeline_ready) = pipeline_cached
             else {
                 unreachable!("Cached pipeline isn't ready");
