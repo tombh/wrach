@@ -69,7 +69,7 @@ impl Plugin for WrachPlugin {
 
 /// Embed the shaders into the binary itself
 fn embed_shaders(app: &mut App) {
-    embedded_asset!(app, "../../../../assets/shaders/wrach_physics.spv");
+    embedded_asset!(app, "../../../../assets/shaders/wrach_physics_shaders.spv");
     embedded_asset!(app, "../../../../assets/shaders/types.wgsl");
     embedded_asset!(app, "../../../../assets/shaders/particles_per_cell.wgsl");
     embedded_asset!(app, "../../../../assets/shaders/prefix_sum.wgsl");

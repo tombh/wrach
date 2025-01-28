@@ -1,0 +1,7 @@
+[
+  {
+    "source_path": "../../assets/shaders/wrach_physics_shaders.spv",
+    "entry_point": "main",
+    "wgsl_entry_point": "main"
+  }
+]

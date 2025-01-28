@@ -42,7 +42,7 @@ impl IntegrationShader {
 
 impl ComputeShader for IntegrationShader {
     fn shader() -> ShaderRef {
-        "embedded://wrach_bevy/plugin/../../../../assets/shaders/wrach_physics.spv".into()
+        "embedded://wrach_bevy/plugin/../../../../assets/shaders/wrach_physics_shaders.spv".into()
     }
 
     fn entry_point<'shader>() -> &'shader str {
