@@ -20,12 +20,20 @@
 - https://github.com/kishimisu/WebGPU-Radix-Sort/blob/main/src/shaders/prefix_sum.js
 - https://github.com/chronicl/particle_life/blob/d4e3482d73bffd15a04474a7cec54b1d31a15736/assets/prefix_sum.wgsl
 
-## Ray Marching
+## Rendering
 
 - https://blog.maximeheckel.com/posts/painting-with-math-a-gentle-study-of-raymarching/
 - https://github.com/electricsquare/raymarching-workshop?tab=readme-ov-file
+- Overview of voxel rendering methods: https://github.com/dubiousconst282/VoxelRT
+- Lots of graphics ideas from Path Of Exile dev: https://www.youtube.com/watch?v=TrHHTQqmAaM
 
-## Shadertoy
+### Radiance Cascades
+
+- https://news.ycombinator.com/item?id=41957008
+- https://jason.today/rc
+- https://simondevyoutube.github.io/Shaders_RadianceCascades/
+
+### Shadertoy
 
 - Hybrid Voxel-SDF Traversal: https://www.shadertoy.com/view/dtVSzw
 - Voxel Tunnel: https://www.shadertoy.com/view/NtfXDl
@@ -86,6 +94,8 @@ colour grading techniques. And he made a 6 hour long video explaining it all htt
 - https://www.youtube.com/@danygankoff
 - https://www.youtube.com/@cyber-gate
 - https://www.youtube.com/@NephPlays C#/OpenGL
+- https://www.youtube.com/@DestinyHailstorm
+- https://www.youtube.com/@DmytroMomotov
 
 ### Code
 

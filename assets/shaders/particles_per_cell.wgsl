@@ -1,8 +1,12 @@
 #import types::WorldSettings;
+#import types::get_cell_index;
+#import types::GRID_MAIN;
+#import types::GRID_AUX;
 
 @group(0) @binding(0) var<uniform> settings: WorldSettings;
-@group(0) @binding(1) var<storage, read> positions: array<vec2<f32>>;
+@group(0) @binding(1) var<storage, read> positions_out: array<vec2<f32>>;
 @group(0) @binding(2) var<storage, read_write> indices_main: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> indices_aux: array<atomic<u32>>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -11,20 +15,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
-    let position_relative_to_viewport_x = positions[index].x - settings.view_anchor.x;
-    let position_relative_to_viewport_y = positions[index].y - settings.view_anchor.y;
+    let cell_offset = 0u;
 
-    let cell_x = u32(
-        floor(
-            position_relative_to_viewport_x / f32(settings.cell_size)
-        )
-    );
-    let cell_y = u32(
-        floor(
-            position_relative_to_viewport_y / f32(settings.cell_size)
-        )
-    );
-    let cell_index = (cell_y * settings.grid_dimensions.x) + cell_x;
+    let particle = positions_out[index];
 
-    atomicAdd(&indices_main[cell_index], 1u);
+    let main_cell_index = get_cell_index(settings, particle, GRID_MAIN, cell_offset);
+    atomicAdd(&indices_main[main_cell_index], 1u);
+
+    let aux_cell_index = get_cell_index(settings, particle, GRID_AUX, cell_offset);
+    atomicAdd(&indices_aux[aux_cell_index], 1u);
 }

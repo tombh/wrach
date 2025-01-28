@@ -6,6 +6,8 @@ use spirv_std::{
 };
 use wrach_cpu_gpu_shared::WorldSettings;
 
+// use crate::WORKGROUP_MEMORY_SIZE;
+
 /// Convenient representation of a particle
 #[derive(Default, Copy, Clone)]
 pub struct Particle {
@@ -33,6 +35,18 @@ impl<'particle> Particle {
                 position: *positions_input.index_unchecked(index),
                 velocity: *velocities_input.index_unchecked(index),
             }
+        }
+    }
+
+    pub const fn new_aux(
+        index: usize,
+        positions_input: &'particle [Vec2; 1024],
+        velocities_input: &'particle [Vec2; 1024],
+    ) -> Self {
+        Self {
+            index,
+            position: positions_input[index],
+            velocity: velocities_input[index],
         }
     }
 

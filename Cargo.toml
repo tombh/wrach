@@ -8,6 +8,7 @@ edition = "2021"
 resolver = "2"
 
 members = [
+  "shaders/shared",
   "shaders/physics",
   "runners/bevy",
   "runners/api",
@@ -54,6 +55,7 @@ features = [
   "bevy_core_pipeline", # Provides cameras and other basic render pipeline features
   "multi_threaded", # Enables multithreaded parallelism in the engine. Disabling it forces all engine tasks to run on a single thread.
   "shader_format_spirv", # To enable Rust-GPU compiled shaders
+	"spirv_shader_passthrough"
 ]
 
 # Development Dependencies
@@ -68,8 +70,10 @@ version = "0.15.1"
 features = [
   "wayland",
   "embedded_watcher", # Hot-reloading `embedded_asset!` assets, like shaders
+	# "spirv_shader_passthrough"
 ]
 
+# [package.metadata.rust-gpu.build]
 
 # Lints
 

@@ -16,8 +16,10 @@ pub struct WrachConfig {
     pub boundaries_as_dimensions: bool,
     /// The size of a single cell in the spatial binning grid used to accelerate particle search.
     ///   - The unit is multiples of the size of a particle (therefore 1).
-    ///   - Playing with this value may improve perforance on certain hardware.
+    ///   - Playing with this value may improve performance on certain hardware.
     pub cell_size: u16,
+    /// Don't run the integration pass (for testing purposes).
+    pub exclude_integration_pass: bool,
 }
 
 impl Default for WrachConfig {
@@ -25,12 +27,13 @@ impl Default for WrachConfig {
     fn default() -> Self {
         Self {
             // 4:3
-            dimensions: (480, 352),
-            // dimensions: (1480, 1052),
+            // dimensions: (480, 352),
+            dimensions: (1480, 1052),
             // Whether particles can leave the edges of the dimensions
             boundaries_as_dimensions: false,
             // Good performance on my Asahi, Apple M1, OpenGL machine
             cell_size: wrach_cpu_gpu_shared::SPATIAL_BIN_CELL_SIZE,
+            exclude_integration_pass: false,
         }
     }
 }

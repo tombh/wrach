@@ -88,6 +88,13 @@ impl SpatialBin {
         (cells, grid_dimensions)
     }
 
+    /// Calculate how many cells there in the auxiliary layer of spatial bins cells. These are the
+    /// cells that are used to get the particles immediately outside a cell.
+    #[allow(clippy::arithmetic_side_effects)]
+    pub const fn calculate_total_aux_cells(&self) -> u32 {
+        (self.grid_dimensions.x + 1) * (self.grid_dimensions.y + 1)
+    }
+
     /// Update the dimensions of the spatial bin grid. The unit is a cell.
     fn update_grid_size(&mut self) {
         let (_cell_list, dimensions) = self.get_active_cells();
@@ -245,5 +252,15 @@ mod test {
                 SpatialBinCoord::new(0, 0),
             ]
         );
+    }
+
+    #[test]
+    fn calculating_total_aux_cells() {
+        let spatial_bin = SpatialBin::new(2, Vec4::new(0.0, 0.0, 4.0, 4.0));
+        let (cells, _grid) = spatial_bin.get_active_cells();
+        assert_eq!(cells.len(), 9);
+
+        let aux_cells = spatial_bin.calculate_total_aux_cells();
+        assert_eq!(aux_cells, 16);
     }
 }

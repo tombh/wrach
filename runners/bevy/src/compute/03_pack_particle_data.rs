@@ -16,11 +16,14 @@ impl PhysicsComputeWorker {
             PackNewParticleDataShader::workgroups(total_particles),
             &[
                 Buffers::WORLD_SETTINGS_UNIFORM,
+                Buffers::INDICES_MAIN,
                 Buffers::POSITIONS_OUT,
                 Buffers::VELOCITIES_OUT,
-                Buffers::INDICES_MAIN,
                 Buffers::POSITIONS_IN,
                 Buffers::VELOCITIES_IN,
+                Buffers::INDICES_AUX,
+                Buffers::POSITIONS_AUX,
+                Buffers::VELOCITIES_AUX,
             ],
         );
         builder
@@ -108,9 +111,7 @@ mod test {
             store.add_particle(particle);
         }
 
-        for _ in 0..4 {
-            wrach.tick();
-        }
+        wrach.tick_until_first_data();
 
         let gpu_packed_data = &wrach.get_simulation_state().packed_data;
         let cpu_packed_data = store.create_packed_data();

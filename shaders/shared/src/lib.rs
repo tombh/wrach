@@ -5,7 +5,7 @@
     reason = "Remove `feature(lint_reasons)` once `rust-gpu` supports Rust 1.81"
 )]
 #![feature(lint_reasons)]
-#![no_std]
+#![cfg_attr(target_arch = "spirv", no_std)]
 
 #[cfg(not(target_arch = "spirv"))]
 use bevy::prelude::{UVec2, Vec2};
@@ -16,6 +16,7 @@ use spirv_std::glam::{UVec2, Vec2};
 // TODO: Document why we can't share with `ShaderWorldSettings` in `bevy/src/config_shader.rs`.
 /// Config needed by the simulation
 #[expect(clippy::exhaustive_structs, reason = "")]
+#[derive(Default)]
 pub struct WorldSettings {
     /// Dimensions of the view onto the simulation
     pub view_dimensions: Vec2,
@@ -31,4 +32,8 @@ pub struct WorldSettings {
 }
 
 /// The size of a single spatial bin cell. The unit is one side of the square.
-pub const SPATIAL_BIN_CELL_SIZE: u16 = 3;
+pub const SPATIAL_BIN_CELL_SIZE: u16 = 2;
+
+/// NB: We add one to cell indexes because our current prefix sum implementation shifts all its items
+/// one to the right.
+pub const PREFIX_SUM_OFFSET_HACK: u32 = 1;

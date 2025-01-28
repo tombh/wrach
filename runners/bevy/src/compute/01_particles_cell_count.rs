@@ -20,6 +20,7 @@ impl PhysicsComputeWorker {
                 Buffers::WORLD_SETTINGS_UNIFORM,
                 Buffers::POSITIONS_OUT,
                 Buffers::INDICES_MAIN,
+                Buffers::INDICES_AUX,
             ],
         );
         builder
