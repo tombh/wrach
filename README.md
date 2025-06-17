@@ -11,8 +11,6 @@ A 2D pixel physics engine. Potentially as the basis for a game like Noita and to
 Using a dedicated Rust GPU shader compiler: https://github.com/rust-gpu/cargo-gpu
 `RUST_LOG=debug cargo run -- build --shader-crate ../wrach/shaders/physics --output-dir ../wrach/assets/shaders --force-overwrite-lockfiles-v4-to-v3`
 
-Currently needds `support-ci-testing-old-rust-gpu-versions` branch.
-
 ## Benchmarks
 
 Release build:
